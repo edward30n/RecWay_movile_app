@@ -1,0 +1,56 @@
+name: test1
+description: "Aplicación profesional para recolección de datos de sensores"
+
+publish_to: 'none'
+
+version: 2.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Sensores mejorados
+  sensors_plus: ^6.1.1
+  
+  # GPS de alta precisión
+  geolocator: ^14.0.2
+  
+  # Permisos
+  permission_handler: ^12.0.1
+  
+  # Base de datos optimizada
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  
+  # Servicio en segundo plano
+  flutter_background_service: ^5.0.5
+  
+  # WakeLock para mantener sensores activos
+  wakelock_plus: ^1.2.8
+  
+  # Notificaciones
+  flutter_local_notifications: ^19.3.0
+  
+  # Compartir archivos
+  share_plus: ^11.0.0
+  
+  # Almacenamiento de archivos
+  path_provider: ^2.1.1
+  
+  # Utilidades
+  intl: ^0.20.2
+  
+  # UI
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

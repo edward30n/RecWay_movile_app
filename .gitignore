@@ -1,0 +1,157 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Database files (SQLite)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Sensor data files and exports
+*.csv
+*.json
+*.log
+sensor_data/
+exports/
+recordings/
+data_exports/
+
+# APK files (opcional - podrías querer versionar releases)
+*.apk
+*.aab
+*.ipa
+
+# Signing keys and certificates (CRÍTICO para seguridad)
+*.keystore
+*.jks
+key.properties
+keystore.properties
+release-key.keystore
+upload-key.keystore
+android/app/keystore/
+android/key.properties
+
+# Local configuration files
+local.properties
+android/local.properties
+
+# Gradle files
+.gradle/
+android/.gradle/
+**/build/
+android/app/build/
+android/build/
+
+# Native compilation artifacts
+android/.cxx/
+android/app/.cxx/
+ios/Flutter/flutter_export_environment.sh
+
+# VS Code specific (recomendado para este proyecto)
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/c_cpp_properties.json
+
+# Background service logs
+background_service.log
+sensor_logs/
+*.service.log
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+*.tmp
+*.temp
+
+# MacOS specific
+.DS_Store
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux specific
+*~
+.nfs*
+
+# IDE specific
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries/
+.idea/shelf/
+.idea/modules.xml
+.idea/compiler.xml
+
+# Flutter/Dart test coverage
+coverage/
+lcov.info
+
+# Firebase (si se agrega en el futuro)
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Documentation generated files
+doc/api/
