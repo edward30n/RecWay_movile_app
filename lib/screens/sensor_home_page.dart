@@ -353,30 +353,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
     }
   }
 
-  void _showPermissionDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Permisos Requeridos'),
-          content: Text(
-            'Esta aplicación necesita permisos de ubicación y sensores para funcionar correctamente. '
-            'Por favor, concede todos los permisos solicitados.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _initializeApp();
-              },
-              child: Text('Reintentar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   void _showLocationServiceDialog() {
     showDialog(
