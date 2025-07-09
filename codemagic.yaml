@@ -1,8 +1,19 @@
 workflows:
-  build-android:
-    name: Build Android
+  build-ios-only:
+    name: iOS only
+    environment:
+      flutter: stable
+      xcode: latest
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
     scripts:
-      - name: Build APK
-        script: |
-          export JAVA_TOOL_OPTIONS="-Xmx4096m"
-          flutter build apk --release
+      - name: Get dependencies
+        script: flutter pub get
+      - name: Build iOS
+        script: flutter build ios --release
+    artifacts:
+      - build/ios/iphoneos/*.ipa
