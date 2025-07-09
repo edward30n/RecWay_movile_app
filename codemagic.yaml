@@ -1,19 +1,20 @@
 workflows:
-  build-ios-only:
-    name: iOS only
+  ios-simulator:
+    name: Build for iOS Simulator
     environment:
       flutter: stable
       xcode: latest
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
     scripts:
       - name: Get dependencies
         script: flutter pub get
-      - name: Build iOS
-        script: flutter build ios --release
+
+      - name: Build iOS for simulator
+        script: flutter build ios --simulator
+
+      - name: Zip the .app
+        script: |
+          cd build/ios/iphonesimulator
+          zip -r Runner.app.zip Runner.app
+
     artifacts:
-      - build/ios/iphoneos/*.ipa
+      - build/ios/iphonesimulator/Runner.app.zip
