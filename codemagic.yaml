@@ -1,0 +1,8 @@
+workflows:
+  build-android:
+    name: Build Android
+    scripts:
+      - name: Build APK
+        script: |
+          export JAVA_TOOL_OPTIONS="-Xmx4096m"
+          flutter build apk --release
