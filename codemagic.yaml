@@ -1,9 +1,14 @@
 workflows:
-  build-ios-simulator:
-    name: iOS Simulator Build (for Appetize)
+  # WORKFLOW PRINCIPAL: iOS para Appetize.io (iPhone)
+  build-ios-appetize:
+    name: iOS Build for Appetize.io (iPhone Only)
     environment:
       flutter: stable
       xcode: latest
+      ios_signing:
+        # CRÍTICO: Usar adhoc para Appetize.io
+        distribution_type: adhoc
+        bundle_identifier: com.recway.sensores
     triggering:
       events:
         - push
@@ -11,16 +16,49 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Get dependencies
+      - name: Get Flutter dependencies
         script: flutter pub get
 
-      - name: Build iOS for Simulator
-        script: flutter build ios --simulator
-
-      - name: Zip the .app for Appetize.io
+      - name: Install CocoaPods dependencies
         script: |
-          cd build/ios/iphonesimulator
-          zip -r Runner.app.zip Runner.app
+          cd ios
+          pod install
+          cd ..
+
+      - name: Build iOS for iPhone (Appetize compatible)
+        script: |
+          flutter build ios --release --no-codesign
+
+      - name: Create .app bundle for Appetize.io
+        script: |
+          cd build/ios/iphoneos
+          zip -r RecWay-Sensores-iPhone.app.zip Runner.app
 
     artifacts:
-      - build/ios/iphonesimulator/Runner.app.zip
+      - build/ios/iphoneos/RecWay-Sensores-iPhone.app.zip
+
+  # WORKFLOW SECUNDARIO: iOS Debug para testing local
+  ios-debug:
+    name: iOS Debug Build (Local Testing)
+    environment:
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.recway.sensores
+    when:
+      condition: $CM_BUILD_TRIGGER == "manual"
+    scripts:
+      - name: Clean and get dependencies
+        script: |
+          flutter clean
+          flutter pub get
+          cd ios
+          pod install
+          cd ..
+      
+      - name: Build iOS Debug
+        script: flutter build ios --debug --no-codesign
+        
+    artifacts:
+      - build/ios/iphoneos/Runner.app
