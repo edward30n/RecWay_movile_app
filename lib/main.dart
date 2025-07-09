@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sensor Data Collector Pro',
+      title: 'RecWay Sensores Pro',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,

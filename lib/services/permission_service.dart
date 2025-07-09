@@ -5,7 +5,7 @@ import 'dart:io';
 
 class PermissionService {
   static Future<bool> requestAllPermissions() async {
-    print('🔐 Iniciando solicitud de permisos...');
+    print('🔐 Iniciando solicitud de permisos para ${Platform.operatingSystem}...');
     
     try {
       // Paso 1: Verificar que los servicios de ubicación estén habilitados
@@ -54,22 +54,39 @@ class PermissionService {
       // Paso 4: Esperar un poco y solicitar ubicación en segundo plano
       await Future.delayed(Duration(seconds: 2));
       print('🏃 Solicitando ubicación en segundo plano...');
-      final backgroundLocationStatus = await Permission.locationAlways.request();
+      
+      PermissionStatus backgroundLocationStatus;
+      if (Platform.isIOS) {
+        // En iOS, primero debemos tener "when in use" antes de solicitar "always"
+        print('🍎 iOS: Solicitando ubicación siempre (requiere "when in use" primero)');
+        backgroundLocationStatus = await Permission.locationAlways.request();
+      } else {
+        // En Android
+        backgroundLocationStatus = await Permission.locationAlways.request();
+      }
       print('🏃 Ubicación siempre: $backgroundLocationStatus');
       
-      // Paso 5: Notificaciones
+      // Paso 5: Notificaciones (importante para iOS)
       print('🔔 Solicitando notificaciones...');
       final notificationStatus = await Permission.notification.request();
       print('🔔 Notificaciones: $notificationStatus');
       
-      // Paso 6: Permisos de almacenamiento
-      print('💾 Solicitando permisos de almacenamiento...');
-      await _requestStoragePermissions();
+      // Paso 6: Permisos de almacenamiento (principalmente Android)
+      if (Platform.isAndroid) {
+        print('💾 Solicitando permisos de almacenamiento (Android)...');
+        await _requestStoragePermissions();
+      } else {
+        print('💾 iOS: Almacenamiento gestionado automáticamente');
+      }
       
-      // Paso 7: Optimización de batería
-      print('🔋 Solicitando ignorar optimización de batería...');
-      final batteryStatus = await Permission.ignoreBatteryOptimizations.request();
-      print('🔋 Batería: $batteryStatus');
+      // Paso 7: Optimización de batería (solo Android)
+      if (Platform.isAndroid) {
+        print('🔋 Solicitando ignorar optimización de batería (Android)...');
+        final batteryStatus = await Permission.ignoreBatteryOptimizations.request();
+        print('🔋 Batería: $batteryStatus');
+      } else {
+        print('🔋 iOS: Optimización de batería gestionada por el sistema');
+      }
       
       // Verificar estado final
       final finalGeoPermission = await Geolocator.checkPermission();

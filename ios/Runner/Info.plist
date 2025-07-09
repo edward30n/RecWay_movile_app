@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Test1</string>
+	<string>RecWay Sensores</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>test1</string>
+	<string>RecWay Sensores</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,5 +45,37 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- ===== PERMISOS PARA SENSORES Y UBICACIÓN ===== -->
+	
+	<!-- Permisos de ubicación -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Esta aplicación necesita acceso a la ubicación para recopilar datos de GPS mientras está en uso.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Esta aplicación necesita acceso a la ubicación en segundo plano para recopilar datos de GPS continuamente durante las sesiones de grabación.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Esta aplicación requiere acceso a la ubicación en segundo plano para funciones de seguimiento continuo.</string>
+	
+	<!-- Permisos de sensores de movimiento -->
+	<key>NSMotionUsageDescription</key>
+	<string>Esta aplicación necesita acceso a los sensores de movimiento (acelerómetro, giroscopio) para recopilar datos de sensores.</string>
+	
+	<!-- Permisos para ejecutar en segundo plano -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>background-fetch</string>
+		<string>background-processing</string>
+	</array>
+	
+	<!-- Configuraciones adicionales para iOS -->
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	
+	<!-- Mantener la pantalla activa durante la grabación -->
+	<key>UIRequiresPersistentWiFi</key>
+	<false/>
 </dict>
 </plist>
