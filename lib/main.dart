@@ -3,6 +3,7 @@ import 'screens/sensor_home_page.dart';
 import 'screens/permission_loading_screen.dart';
 import 'services/background_service.dart';
 import 'services/permission_service.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,15 +18,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'RecWay Sensor Data Collector',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.blue.shade700,
-          foregroundColor: Colors.white,
-          elevation: 2,
-        ),
-      ),
+      theme: AppTheme.darkTheme,
       home: AppInitializer(),
       debugShowCheckedModeBanner: false,
     );

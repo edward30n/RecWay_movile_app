@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 enum ExportFormat { csv, json }
 
@@ -47,29 +48,29 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
     return ScaleTransition(
       scale: _scaleAnimation,
       child: AlertDialog(
+        backgroundColor: AppColors.primaryMedium,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusL),
         ),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                borderRadius: BorderRadius.circular(10),
+                color: AppColors.accentBlue.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
               ),
               child: Icon(
                 Icons.file_download,
-                color: Colors.blue.shade700,
+                color: AppColors.accentBlue,
                 size: 24,
               ),
             ),
             const SizedBox(width: 12),
-            const Text(
+            Text(
               'Exportar Datos',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              style: AppTextStyles.headline3.copyWith(
+                color: Colors.white,
               ),
             ),
           ],
@@ -78,23 +79,27 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.primaryDark.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+                border: Border.all(
+                  color: AppColors.accentBlue.withOpacity(0.3),
+                  width: 1,
+                ),
               ),
               child: Column(
                 children: [
                   Row(
                     children: [
                       Icon(Icons.info_outline, 
-                           color: Colors.blue.shade600, size: 20),
+                           color: AppColors.accentBlue, size: 20),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Información de la sesión',
-                        style: TextStyle(
+                      Text(
+                        'Información',
+                        style: AppTextStyles.body1.copyWith(
                           fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -102,22 +107,30 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Text('Sesión: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                      Text('Sesión: ', style: AppTextStyles.body1.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      )),
                       Expanded(
                         child: Text(
                           widget.sessionId.substring(8, 18),
-                          style: TextStyle(color: Colors.grey.shade700),
+                          style: AppTextStyles.body2.copyWith(
+                            color: Colors.white70,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      const Text('Muestras: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                      Text('Muestras: ', style: AppTextStyles.body1.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      )),
                       Text(
                         '${widget.totalSamples}',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
+                        style: AppTextStyles.body1.copyWith(
+                          color: AppColors.accentBlue,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -126,31 +139,31 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            const Text(
+            const SizedBox(height: AppDimensions.paddingL),
+            Text(
               'Selecciona el formato de exportación:',
-              style: TextStyle(
-                fontSize: 16,
+              style: AppTextStyles.body1.copyWith(
                 fontWeight: FontWeight.w500,
+                color: Colors.white,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppDimensions.paddingM),
             
             // Opción CSV
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
                 border: Border.all(
                   color: _selectedFormat == ExportFormat.csv 
-                    ? Colors.blue.shade400 
-                    : Colors.grey.shade300,
+                    ? AppColors.accentBlue 
+                    : Colors.white30,
                   width: _selectedFormat == ExportFormat.csv ? 2 : 1,
                 ),
                 color: _selectedFormat == ExportFormat.csv
-                  ? Colors.blue.shade50
-                  : Colors.white,
+                  ? AppColors.accentBlue.withOpacity(0.15)
+                  : AppColors.primaryBlue.withOpacity(0.5),
               ),
               child: InkWell(
                 onTap: () => setState(() => _selectedFormat = ExportFormat.csv),
@@ -160,17 +173,17 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
                       value: ExportFormat.csv,
                       groupValue: _selectedFormat,
                       onChanged: (value) => setState(() => _selectedFormat = value!),
-                      activeColor: Colors.blue.shade600,
+                      activeColor: AppColors.accentBlue,
                     ),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade100,
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.success.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusS),
                       ),
                       child: Icon(
                         Icons.table_chart,
-                        color: Colors.green.shade700,
+                        color: AppColors.success,
                         size: 20,
                       ),
                     ),
@@ -179,19 +192,18 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'CSV (Recomendado)',
-                            style: TextStyle(
+                          Text(
+                            'CSV',
+                            style: AppTextStyles.body1.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Formato tabular con metadatos completos. Compatible con Excel, Google Sheets, Python, R.',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12,
+                            'Formato tabular con metadatos completos.',
+                            style: AppTextStyles.body2.copyWith(
+                              color: Colors.white70,
                             ),
                           ),
                         ],
@@ -202,23 +214,23 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
               ),
             ),
             
-            const SizedBox(height: 12),
+            const SizedBox(height: AppDimensions.paddingM),
             
             // Opción JSON
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
                 border: Border.all(
                   color: _selectedFormat == ExportFormat.json 
-                    ? Colors.blue.shade400 
-                    : Colors.grey.shade300,
+                    ? AppColors.accentBlue 
+                    : Colors.white30,
                   width: _selectedFormat == ExportFormat.json ? 2 : 1,
                 ),
                 color: _selectedFormat == ExportFormat.json
-                  ? Colors.blue.shade50
-                  : Colors.white,
+                  ? AppColors.accentBlue.withOpacity(0.15)
+                  : AppColors.primaryBlue.withOpacity(0.5),
               ),
               child: InkWell(
                 onTap: () => setState(() => _selectedFormat = ExportFormat.json),
@@ -228,17 +240,17 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
                       value: ExportFormat.json,
                       groupValue: _selectedFormat,
                       onChanged: (value) => setState(() => _selectedFormat = value!),
-                      activeColor: Colors.blue.shade600,
+                      activeColor: AppColors.accentBlue,
                     ),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.warning.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusS),
                       ),
                       child: Icon(
                         Icons.code,
-                        color: Colors.orange.shade700,
+                        color: AppColors.warning,
                         size: 20,
                       ),
                     ),
@@ -247,19 +259,18 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'JSON',
-                            style: TextStyle(
+                            style: AppTextStyles.body1.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Formato estructurado ideal para APIs y aplicaciones web. Incluye metadatos anidados.',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12,
+                            'Formato estructurado.',
+                            style: AppTextStyles.body2.copyWith(
+                              color: Colors.white70,
                             ),
                           ),
                         ],
@@ -276,7 +287,9 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
             onPressed: () => Navigator.of(context).pop(),
             child: Text(
               'Cancelar',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: AppTextStyles.button.copyWith(
+                color: Colors.white70,
+              ),
             ),
           ),
           ElevatedButton.icon(
@@ -284,12 +297,15 @@ class _ExportFormatDialogState extends State<ExportFormatDialog>
             icon: const Icon(Icons.download, size: 18),
             label: const Text('Exportar'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade600,
+              backgroundColor: AppColors.accentBlue,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.paddingL, 
+                vertical: AppDimensions.paddingM,
+              ),
             ),
           ),
         ],

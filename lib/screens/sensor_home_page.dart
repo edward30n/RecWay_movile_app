@@ -14,9 +14,8 @@ import '../services/permission_service.dart';
 import '../services/native_sensor_service.dart';
 import '../services/device_info_service.dart';
 import '../widgets/sensor_card.dart';
-import '../widgets/control_panel.dart';
-import '../widgets/status_cards.dart';
 import '../widgets/export_format_dialog.dart';
+import '../theme/app_theme.dart';
 
 class SensorHomePage extends StatefulWidget {
   const SensorHomePage({super.key});
@@ -36,6 +35,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
   int _recordingTime = 0;
   Timer? _timer;
   Timer? _samplingTimer; // Timer para controlar la frecuencia de muestreo
+  Timer? _uiUpdateTimer; // Timer para controlar las actualizaciones de UI
   int _dataCount = 0;
   String? _currentSessionId;
   
@@ -47,11 +47,24 @@ class _SensorHomePageState extends State<SensorHomePage> {
   AccelerometerEvent? _currentAccelerometer;
   GyroscopeEvent? _currentGyroscope;
   Position? _currentPosition;
+  
+  // Control de actualizaciones de UI
+  bool _shouldUpdateUI = true;
 
   @override
   void initState() {
     super.initState();
     _initializeApp();
+    _startUIUpdateTimer();
+  }
+  
+  /// Inicia el timer para limitar las actualizaciones de UI a 1 vez por segundo
+  void _startUIUpdateTimer() {
+    _uiUpdateTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        _shouldUpdateUI = true;
+      });
+    });
   }
 
   Future<void> _initializeApp() async {
@@ -108,9 +121,12 @@ class _SensorHomePageState extends State<SensorHomePage> {
       locationSettings: locationSettings,
     ).listen(
       (Position position) {
-        setState(() {
-          _currentPosition = position;
-        });
+        _currentPosition = position;
+        if (_shouldUpdateUI) {
+          setState(() {
+            _shouldUpdateUI = false;
+          });
+        }
         // No guardamos aquí, el timer se encarga de eso
       },
       onError: (error) {
@@ -126,9 +142,12 @@ class _SensorHomePageState extends State<SensorHomePage> {
       samplingPeriod: SensorInterval.gameInterval, // 20ms para mejor respuesta
     ).listen(
       (AccelerometerEvent event) {
-        setState(() {
-          _currentAccelerometer = event;
-        });
+        _currentAccelerometer = event;
+        if (_shouldUpdateUI) {
+          setState(() {
+            _shouldUpdateUI = false;
+          });
+        }
         // Log para verificar que los datos cambian
        // print('📱 APP Accel: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
       },
@@ -138,9 +157,12 @@ class _SensorHomePageState extends State<SensorHomePage> {
       samplingPeriod: SensorInterval.gameInterval, // 20ms para mejor respuesta
     ).listen(
       (GyroscopeEvent event) {
-        setState(() {
-          _currentGyroscope = event;
-        });
+        _currentGyroscope = event;
+        if (_shouldUpdateUI) {
+          setState(() {
+            _shouldUpdateUI = false;
+          });
+        }
         // Log para verificar que los datos cambian
         //print('📱 APP Gyro: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
       },
@@ -439,11 +461,31 @@ class _SensorHomePageState extends State<SensorHomePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: AppColors.primaryMedium,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+        ),
         title: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 24),
-            SizedBox(width: 8),
-            Text('¡Datos Exportados!'),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+              ),
+              child: Icon(
+                Icons.check_circle, 
+                color: AppColors.success, 
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Datos Exportados',
+              style: AppTextStyles.headline3.copyWith(
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -451,46 +493,79 @@ class _SensorHomePageState extends State<SensorHomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                color: AppColors.primaryDark.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+                border: Border.all(
+                  color: AppColors.success.withOpacity(0.3),
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('📊 Registros exportados: $recordCount'),
-                  Text('📁 Archivo: $fileName'),
-                  Text('💾 Ubicaciones: ${files.length}'),
+                  Text(
+                    'Registros exportados: $recordCount',
+                    style: AppTextStyles.body1.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Archivo: $fileName',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ubicaciones: ${files.length}',
+                    style: AppTextStyles.body2.copyWith(
+                      color: Colors.white70,
+                    ),
+                  ),
                 ],
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: AppDimensions.paddingM),
             Text(
               'El archivo se guardó en:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: AppTextStyles.body1.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: AppDimensions.paddingS),
             ...files.map((file) => Padding(
-              padding: EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
-                  Icon(Icons.folder, size: 16, color: Colors.grey[600]),
-                  SizedBox(width: 4),
+                  Icon(
+                    Icons.folder, 
+                    size: 16, 
+                    color: AppColors.accentBlue,
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _getReadableePath(file.path),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      style: AppTextStyles.body2.copyWith(
+                        color: Colors.white70,
+                      ),
                     ),
                   ),
                 ],
               ),
             )).toList(),
-            SizedBox(height: 16),
+            const SizedBox(height: AppDimensions.paddingM),
             Text(
-              '¿Qué quieres hacer ahora?',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[700]),
+              'Que quieres hacer ahora?',
+              style: AppTextStyles.body1.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.accentBlue,
+              ),
             ),
           ],
         ),
@@ -500,19 +575,36 @@ class _SensorHomePageState extends State<SensorHomePage> {
               Navigator.pop(context);
               _shareFile(files.first);
             },
-            icon: Icon(Icons.share, color: Colors.blue),
-            label: Text('Compartir'),
+            icon: Icon(Icons.share, color: AppColors.accentBlue),
+            label: Text(
+              'Compartir',
+              style: AppTextStyles.button.copyWith(
+                color: AppColors.accentBlue,
+              ),
+            ),
           ),
           TextButton.icon(
             onPressed: () {
               Navigator.pop(context);
               _showFileDetailsDialog(files, recordCount);
             },
-            icon: Icon(Icons.info, color: Colors.orange),
-            label: Text('Detalles'),
+            icon: Icon(Icons.info, color: AppColors.warning),
+            label: Text(
+              'Detalles',
+              style: AppTextStyles.button.copyWith(
+                color: AppColors.warning,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentBlue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+              ),
+            ),
             child: Text('Cerrar'),
           ),
         ],
@@ -534,41 +626,77 @@ class _SensorHomePageState extends State<SensorHomePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('📋 Detalles del Archivo'),
+        backgroundColor: AppColors.primaryMedium,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusL),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.info.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+              ),
+              child: Icon(
+                Icons.info_outline,
+                color: AppColors.info,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Detalles del Archivo',
+              style: AppTextStyles.headline3.copyWith(
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildDetailItem('📊 Registros', recordCount.toString()),
-              _buildDetailItem('📅 Fecha', DateTime.now().toString().split(' ')[0]),
-              _buildDetailItem('⏰ Hora', DateTime.now().toString().split(' ')[1].split('.')[0]),
-              _buildDetailItem('💾 Archivos guardados', files.length.toString()),
-              SizedBox(height: 16),
+              _buildDetailItem('Registros', recordCount.toString()),
+              _buildDetailItem('Fecha', DateTime.now().toString().split(' ')[0]),
+              _buildDetailItem('Hora', DateTime.now().toString().split(' ')[1].split('.')[0]),
+              _buildDetailItem('Archivos guardados', files.length.toString()),
+              const SizedBox(height: AppDimensions.paddingM),
               Text(
                 'Ubicaciones de archivos:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: AppTextStyles.body1.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: AppDimensions.paddingS),
               ...files.map((file) => Container(
-                margin: EdgeInsets.symmetric(vertical: 4),
-                padding: EdgeInsets.all(8),
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(4),
+                  color: AppColors.primaryDark.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                  border: Border.all(
+                    color: AppColors.accentBlue.withOpacity(0.3),
+                    width: 1,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _getReadableePath(file.path),
-                      style: TextStyle(fontWeight: FontWeight.w500),
+                      style: AppTextStyles.body1.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       file.path,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey[600],
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white70,
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -584,11 +712,23 @@ class _SensorHomePageState extends State<SensorHomePage> {
               Navigator.pop(context);
               _shareFile(files.first);
             },
-            icon: Icon(Icons.share),
-            label: Text('Compartir'),
+            icon: Icon(Icons.share, color: AppColors.accentBlue),
+            label: Text(
+              'Compartir',
+              style: AppTextStyles.button.copyWith(
+                color: AppColors.accentBlue,
+              ),
+            ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentBlue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+              ),
+            ),
             child: Text('Cerrar'),
           ),
         ],
@@ -598,17 +738,26 @@ class _SensorHomePageState extends State<SensorHomePage> {
 
   Widget _buildDetailItem(String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           SizedBox(
             width: 120,
             child: Text(
               label,
-              style: TextStyle(fontWeight: FontWeight.w500),
+              style: AppTextStyles.body1.copyWith(
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
             ),
           ),
-          Text(value),
+          Text(
+            value,
+            style: AppTextStyles.body1.copyWith(
+              color: AppColors.accentBlue,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -638,12 +787,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
         ),
       );
     }
-  }
-
-  String _formatTime(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   Future<void> _requestBatteryOptimizationPermission() async {
@@ -759,57 +902,452 @@ class _SensorHomePageState extends State<SensorHomePage> {
     );
   }
 
+  /// Construye la sección de estado con cards modernas
+  Widget _buildStatusSection() {
+    return Column(
+      children: [
+        // Fila superior con métricas
+        Row(
+          children: [
+            Expanded(
+              child: AppWidgets.gradientCard(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.timer,
+                      color: AppColors.accentBlue,
+                      size: AppDimensions.iconM,
+                    ),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    Text('Tiempo', style: AppTextStyles.sensorLabel),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    Text(
+                      _formatTime(_recordingTime),
+                      style: AppTextStyles.headline3.copyWith(
+                        color: AppColors.accentBlue,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: AppDimensions.paddingS),
+            Expanded(
+              child: AppWidgets.gradientCard(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.data_usage,
+                      color: AppColors.accentCyan,
+                      size: AppDimensions.iconM,
+                    ),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    Text('Muestras', style: AppTextStyles.sensorLabel),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    Text(
+                      '$_dataCount',
+                      style: AppTextStyles.headline3.copyWith(
+                        color: AppColors.accentCyan,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: AppDimensions.paddingS),
+            Expanded(
+              child: AppWidgets.gradientCard(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.speed,
+                      color: AppColors.warning,
+                      size: AppDimensions.iconM,
+                    ),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    Text('Freq.', style: AppTextStyles.sensorLabel),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    GestureDetector(
+                      onTap: _showFrequencySelector,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                          border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '$_samplingRate Hz',
+                            style: AppTextStyles.headline3.copyWith(
+                              color: AppColors.warning,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: AppDimensions.paddingM),
+        
+        // Estado centrado debajo
+        Container(
+          width: double.infinity,
+          child: AppWidgets.gradientCard(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _isRecording ? Icons.fiber_manual_record : Icons.sensors,
+                  color: _isRecording ? AppColors.error : AppColors.accentBlue,
+                  size: AppDimensions.iconS,
+                ),
+                const SizedBox(width: AppDimensions.paddingS),
+                Text(
+                  _isRecording 
+                    ? 'Grabando datos...'
+                    : 'Listo para grabar',
+                  style: AppTextStyles.body1.copyWith(
+                    color: _isRecording ? AppColors.error : AppColors.accentBlue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Construye la sección de control con botones modernos
+  Widget _buildControlSection() {
+    return AppWidgets.gradientCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Control de Grabación',
+            style: AppTextStyles.headline3,
+          ),
+          const SizedBox(height: AppDimensions.paddingM),
+          
+          // Botones principales
+          Row(
+            children: [
+              Expanded(
+                child: AppWidgets.gradientButton(
+                  text: _isRecording ? 'Detener' : 'Iniciar',
+                  icon: _isRecording ? Icons.stop : Icons.play_arrow,
+                  onPressed: _isRecording ? _stopRecording : _startRecording,
+                ),
+              ),
+              const SizedBox(width: AppDimensions.paddingM),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryMedium.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+                    border: Border.all(
+                      color: AppColors.accentBlue.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _dataCount > 0 ? _exportData : null,
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDimensions.paddingL,
+                          vertical: AppDimensions.paddingM,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.file_download,
+                              color: _dataCount > 0 ? AppColors.accentBlue : AppColors.surface.withOpacity(0.5),
+                              size: AppDimensions.iconS,
+                            ),
+                            const SizedBox(width: AppDimensions.paddingS),
+                            Text(
+                              'Exportar',
+                              style: AppTextStyles.button.copyWith(
+                                color: _dataCount > 0 ? AppColors.surface : AppColors.surface.withOpacity(0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: AppDimensions.paddingM),
+          
+          // Configuración
+          _buildConfigurationSection(),
+        ],
+      ),
+    );
+  }
+
+  /// Construye la sección de configuración
+  Widget _buildConfigurationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Configuración',
+          style: AppTextStyles.sensorLabel,
+        ),
+        const SizedBox(height: AppDimensions.paddingM),
+        
+        // Frecuencia de muestreo
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Frecuencia: $_samplingRate Hz',
+                style: AppTextStyles.body1,
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.primaryMedium.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: _samplingRate > 1 ? () {
+                      setState(() {
+                        _samplingRate = (_samplingRate - 1).clamp(1, 100);
+                      });
+                    } : null,
+                    icon: const Icon(Icons.remove, color: AppColors.surface),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                  Text(
+                    '$_samplingRate',
+                    style: AppTextStyles.sensorValue.copyWith(fontSize: 14),
+                  ),
+                  IconButton(
+                    onPressed: _samplingRate < 100 ? () {
+                      setState(() {
+                        _samplingRate = (_samplingRate + 1).clamp(1, 100);
+                      });
+                    } : null,
+                    icon: const Icon(Icons.add, color: AppColors.surface),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: AppDimensions.paddingM),
+        
+        // Modo en segundo plano
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Segundo plano',
+                style: AppTextStyles.body1,
+              ),
+            ),
+            Switch(
+              value: _backgroundMode,
+              onChanged: (value) {
+                setState(() {
+                  _backgroundMode = value;
+                });
+              },
+              activeColor: AppColors.accentBlue,
+              inactiveThumbColor: AppColors.surface.withOpacity(0.5),
+              inactiveTrackColor: AppColors.primaryMedium.withOpacity(0.5),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Construye la sección de datos de sensores
+  Widget _buildSensorSection() {
+    return SensorCard(
+      accelerometer: _currentAccelerometer,
+      gyroscope: _currentGyroscope,
+      position: _currentPosition,
+    );
+  }
+
+  /// Formatea el tiempo en formato mm:ss
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  /// Muestra el diálogo de selección de frecuencia
+  void _showFrequencySelector() {
+    if (_isRecording) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se puede cambiar la frecuencia durante la grabación'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text(
+          'Seleccionar Frecuencia',
+          style: AppTextStyles.headline3.copyWith(color: AppColors.onSurface),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Selecciona la frecuencia de muestreo para los sensores:',
+              style: AppTextStyles.body1.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+            ...[ 1, 5, 10, 20, 50].map((frequency) => Container(
+              margin: const EdgeInsets.symmetric(vertical: AppDimensions.paddingXS),
+              child: ListTile(
+                leading: Icon(
+                  Icons.speed,
+                  color: _samplingRate == frequency ? AppColors.accentBlue : AppColors.onSurfaceVariant,
+                ),
+                title: Text(
+                  '$frequency Hz',
+                  style: AppTextStyles.body1.copyWith(
+                    color: _samplingRate == frequency ? AppColors.accentBlue : AppColors.onSurface,
+                    fontWeight: _samplingRate == frequency ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                subtitle: Text(
+                  _getFrequencyDescription(frequency),
+                  style: AppTextStyles.body2.copyWith(color: AppColors.onSurfaceVariant),
+                ),
+                selected: _samplingRate == frequency,
+                selectedTileColor: AppColors.accentBlue.withOpacity(0.1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+                ),
+                onTap: () {
+                  setState(() {
+                    _samplingRate = frequency;
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            )).toList(),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancelar',
+              style: AppTextStyles.button.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Obtiene la descripción de cada frecuencia
+  String _getFrequencyDescription(int frequency) {
+    switch (frequency) {
+      case 1:
+        return 'Muy baja - Ahorro máximo de batería';
+      case 5:
+        return 'Baja - Buena para movimientos lentos';
+      case 10:
+        return 'Normal - Equilibrio entre precisión y batería';
+      case 20:
+        return 'Alta - Buena para movimientos rápidos';
+      case 50:
+        return 'Muy alta - Máxima precisión';
+      default:
+        return 'Personalizada';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Sensor Data Collector Pro'),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Status Cards
-            StatusCards(
-              recordingTime: _recordingTime,
-              dataCount: _dataCount,
-              samplingRate: _samplingRate,
-              isRecording: _isRecording,
-            ),
-            
-            SizedBox(height: 24),
-
-            // Control Panel
-            ControlPanel(
-              isRecording: _isRecording,
-              samplingRate: _samplingRate,
-              backgroundMode: _backgroundMode,
-              dataCount: _dataCount,
-              onStartRecording: _startRecording,
-              onStopRecording: _stopRecording,
-              onExportData: _exportData,
-              onSamplingRateChanged: (rate) {
-                setState(() {
-                  _samplingRate = rate;
-                });
-              },
-              onBackgroundModeChanged: (enabled) {
-                setState(() {
-                  _backgroundMode = enabled;
-                });
-              },
-            ),
-
-            SizedBox(height: 24),
-
-            // Sensor Data Display
-            SensorCard(
-              accelerometer: _currentAccelerometer,
-              gyroscope: _currentGyroscope,
-              position: _currentPosition,
-            ),
-          ],
+      backgroundColor: AppColors.primaryDark,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: AppColors.primaryGradient,
+        ),
+        child: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              // App Bar minimalista
+              SliverAppBar(
+                expandedHeight: 60,
+                floating: false,
+                pinned: false,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Contenido principal
+              SliverPadding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // Status Cards mejoradas
+                    _buildStatusSection(),
+                    
+                    const SizedBox(height: AppDimensions.paddingL),
+                    
+                    // Control Panel moderno
+                    _buildControlSection(),
+                    
+                    const SizedBox(height: AppDimensions.paddingL),
+                    
+                    // Sensor Data Display mejorado
+                    _buildSensorSection(),
+                  ]),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -818,6 +1356,8 @@ class _SensorHomePageState extends State<SensorHomePage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _samplingTimer?.cancel();
+    _uiUpdateTimer?.cancel();
     _accelerometerSubscription?.cancel();
     _gyroscopeSubscription?.cancel();
     _positionSubscription?.cancel();
