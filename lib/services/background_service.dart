@@ -11,74 +11,98 @@ import 'native_sensor_service.dart';
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
   
+  // Configuración más robusta del servicio
   await service.configure(
     androidConfiguration: AndroidConfiguration(
       onStart: onStart,
-      autoStart: true,
+      autoStart: false, // Cambiado a false para evitar auto-inicio
       isForegroundMode: true,
       notificationChannelId: 'sensor_data_collector',
-      initialNotificationTitle: 'Sensor Data Collector Pro',
-      initialNotificationContent: 'Recolectando datos en segundo plano...',
+      initialNotificationTitle: 'RecWay Sensor Collector',
+      initialNotificationContent: 'Preparando recolección de datos...',
       foregroundServiceNotificationId: 888,
+      autoStartOnBoot: false, // Evitar inicio automático en boot
     ),
     iosConfiguration: IosConfiguration(
-      autoStart: true,
+      autoStart: false,
       onForeground: onStart,
       onBackground: onIosBackground,
     ),
   );
+  
+  print('🔧 Servicio configurado correctamente');
 }
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
-  DartPluginRegistrant.ensureInitialized();
-  
-  // ACTIVAR WAKELOCK PARA MANTENER CPU ACTIVO
-  await WakelockPlus.enable();
-  print('🔋 WakeLock activado para mantener sensores activos');
-  
-  // Variables para el muestreo controlado
-  Timer? samplingTimer;
-  String? currentSessionId;
-  int samplingRate = 10;
-  bool isRecording = false;
-  
-  // Datos actuales de sensores
-  AccelerometerEvent? currentAccelerometer;
-  GyroscopeEvent? currentGyroscope;
-  Position? currentPosition;
-  
-  // Streams de sensores
-  StreamSubscription<AccelerometerEvent>? accelerometerSubscription;
-  StreamSubscription<GyroscopeEvent>? gyroscopeSubscription;
-  StreamSubscription<Position>? positionSubscription;
-  
-  // Timer para forzar lectura de sensores
-  Timer? sensorForceTimer;
-  
-  if (service is AndroidServiceInstance) {
-    service.on('setAsForeground').listen((event) {
-      service.setAsForegroundService();
+  try {
+    DartPluginRegistrant.ensureInitialized();
+    
+    print('🔄 Iniciando servicio en segundo plano...');
+    
+    // ACTIVAR WAKELOCK PARA MANTENER CPU ACTIVO
+    try {
+      await WakelockPlus.enable();
+      print('🔋 WakeLock activado para mantener sensores activos');
+    } catch (e) {
+      print('⚠️ Error activando WakeLock: $e');
+    }
+    
+    // Variables para el muestreo controlado
+    Timer? samplingTimer;
+    String? currentSessionId;
+    int samplingRate = 10;
+    bool isRecording = false;
+    
+    // Datos actuales de sensores
+    AccelerometerEvent? currentAccelerometer;
+    GyroscopeEvent? currentGyroscope;
+    Position? currentPosition;
+    
+    // Streams de sensores
+    StreamSubscription<AccelerometerEvent>? accelerometerSubscription;
+    StreamSubscription<GyroscopeEvent>? gyroscopeSubscription;
+    StreamSubscription<Position>? positionSubscription;
+    
+    // Timer para forzar lectura de sensores
+    Timer? sensorForceTimer;
+    
+    if (service is AndroidServiceInstance) {
+      try {
+        service.on('setAsForeground').listen((event) {
+          try {
+            service.setAsForegroundService();
+          } catch (e) {
+            print('⚠️ Error estableciendo servicio foreground: $e');
+          }
+        });
+        
+        service.on('setAsBackground').listen((event) {
+          try {
+            service.setAsBackgroundService();
+          } catch (e) {
+            print('⚠️ Error estableciendo servicio background: $e');
+          }
+        });
+      } catch (e) {
+        print('⚠️ Error configurando listeners Android: $e');
+      }
+    }
+    
+    service.on('stopService').listen((event) {
+      print('🛑 Deteniendo servicio...');
+      service.stopSelf();
     });
     
-    service.on('setAsBackground').listen((event) {
-      service.setAsBackgroundService();
-    });
-  }
-  
-  service.on('stopService').listen((event) {
-    service.stopSelf();
-  });
-  
-  // Configurar GPS con máxima precisión
-  const LocationSettings locationSettings = LocationSettings(
-    accuracy: LocationAccuracy.bestForNavigation,
-    distanceFilter: 0,
-    timeLimit: Duration(seconds: 30),
-  );
-  
-  // Escuchar comandos de la aplicación principal
-  service.on('startRecording').listen((event) async {
+    // Configurar GPS con máxima precisión
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 0,
+      timeLimit: Duration(seconds: 30),
+    );
+    
+    // Escuchar comandos de la aplicación principal
+    service.on('startRecording').listen((event) async {
     final data = event!;
     currentSessionId = data['sessionId'] as String?;
     samplingRate = data['samplingRate'] as int? ?? 10;
@@ -246,6 +270,10 @@ void onStart(ServiceInstance service) async {
   });
   
   print('🚀 Servicio en segundo plano iniciado con WakeLock');
+  
+  } catch (e) {
+    print('❌ Error crítico en el servicio en segundo plano: $e');
+  }
 }
 
 Future<void> _saveDataPoint(

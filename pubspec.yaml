@@ -44,6 +44,12 @@ dependencies:
   # Utilidades
   intl: ^0.20.2
   
+  # Información del dispositivo
+  device_info_plus: ^11.1.0
+  package_info_plus: ^8.0.3
+  shared_preferences: ^2.3.5
+  crypto: ^3.0.6
+  
   # UI
   cupertino_icons: ^1.0.8
 

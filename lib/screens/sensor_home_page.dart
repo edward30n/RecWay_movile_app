@@ -8,12 +8,15 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import '../services/database_service.dart';
 import '../services/permission_service.dart';
 import '../services/native_sensor_service.dart';
+import '../services/device_info_service.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
+import '../widgets/export_format_dialog.dart';
 
 class SensorHomePage extends StatefulWidget {
   const SensorHomePage({super.key});
@@ -54,334 +57,15 @@ class _SensorHomePageState extends State<SensorHomePage> {
   Future<void> _initializeApp() async {
     print('🚀 === INICIANDO APLICACIÓN ===');
     
-    // Verificar estado inicial de permisos
+    // Verificar estado final de permisos (ya fueron solicitados en main.dart)
     await PermissionService.checkAndLogAllPermissions();
-    
-    // Verificar si es la primera vez que se abre la app
-    final isFirstLaunch = await _isFirstLaunch();
-    
-    if (isFirstLaunch) {
-      print('🆕 Primera vez abriendo la app');
-      // Mostrar diálogo de bienvenida y explicación de permisos
-      await _showWelcomeAndPermissionsDialog();
-    }
-    
-    print('🔐 Iniciando solicitud de permisos paso a paso...');
-    
-    // Primero intentar los permisos de ubicación paso a paso
-    bool locationSuccess = await PermissionService.requestLocationPermissionsStepByStep();
-    
-    if (locationSuccess) {
-      print('✅ Permisos de ubicación obtenidos, continuando con otros permisos...');
-      
-      // Ahora solicitar el resto de permisos
-      final allPermissionsGranted = await PermissionService.requestAllPermissions();
-      print('📋 Resultado todos los permisos: $allPermissionsGranted');
-      
-      if (!allPermissionsGranted) {
-        print('⚠️ Algunos permisos adicionales no fueron concedidos');
-      }
-    } else {
-      print('❌ No se pudieron obtener permisos de ubicación - funcionalidad limitada');
-      _showLocationPermissionRequiredDialog();
-    }
-
-    print('🛰️ Verificando servicios de ubicación...');
-    final locationServicesEnabled = await PermissionService.checkLocationServices();
-    if (!locationServicesEnabled) {
-      print('❌ Servicios de ubicación deshabilitados');
-      _showLocationServiceDialog();
-    } else {
-      print('✅ Servicios de ubicación habilitados');
-    }
-
-    // Verificar permisos específicos después de la solicitud
-    await _checkAndRequestSpecificPermissions();
     
     // Solicitar deshabilitar optimización de batería y configurar sensores nativos
     await _requestBatteryOptimizationPermission();
     await _initializeNativeSensors();
     
-    // Log final del estado
-    await PermissionService.checkAndLogAllPermissions();
-    
-    print('✅ === INICIALIZACIÓN COMPLETA ===');
+    print('✅ === SENSOR HOME INICIALIZADA ===');
   }
-
-  Future<bool> _isFirstLaunch() async {
-    // Aquí podrías usar SharedPreferences para verificar si es el primer lanzamiento
-    // Por simplicidad, siempre mostraremos el diálogo en esta versión
-    return true;
-  }
-
-  Future<void> _showWelcomeAndPermissionsDialog() async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.sensors, color: Colors.blue, size: 28),
-              SizedBox(width: 8),
-              Text('¡Bienvenido!'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Esta aplicación recolecta datos de sensores y GPS para análisis científico.',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Permisos necesarios:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 8),
-                _buildPermissionExplanation(
-                  Icons.location_on,
-                  'Ubicación TODO EL TIEMPO',
-                  'Permite recolectar datos GPS precisos incluso cuando la app está en segundo plano',
-                  isImportant: true,
-                ),
-                _buildPermissionExplanation(
-                  Icons.sensors,
-                  'Sensores',
-                  'Acceso a acelerómetro y giroscopio del dispositivo',
-                ),
-                _buildPermissionExplanation(
-                  Icons.notifications,
-                  'Notificaciones',
-                  'Mostrar el estado de grabación y alertas importantes',
-                ),
-                _buildPermissionExplanation(
-                  Icons.storage,
-                  'Almacenamiento',
-                  'Guardar y exportar archivos de datos al dispositivo',
-                ),
-                SizedBox(height: 16),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info, color: Colors.orange.shade700, size: 20),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Para "Ubicación TODO EL TIEMPO", selecciona "Permitir todo el tiempo" en la configuración.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.orange.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: Icon(Icons.check),
-              label: Text('Continuar'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildPermissionExplanation(IconData icon, String title, String description, {bool isImportant = false}) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon, 
-            size: 20, 
-            color: isImportant ? Colors.red.shade600 : Colors.grey.shade600,
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: isImportant ? Colors.red.shade700 : null,
-                  ),
-                ),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _checkAndRequestSpecificPermissions() async {
-    // Verificar ubicación "todo el tiempo"
-    final hasLocationAlways = await PermissionService.hasLocationAlwaysPermission();
-    if (!hasLocationAlways) {
-      await _showLocationAlwaysInstructions();
-    }
-
-    // Verificar permisos de almacenamiento
-    final hasStorage = await PermissionService.hasStoragePermission();
-    if (!hasStorage) {
-      _showStoragePermissionDialog();
-    }
-  }
-
-  void _showStoragePermissionDialog() {
-    PermissionService.showPermissionDialog(
-      context,
-      '💾 Permiso de Almacenamiento',
-      'Para exportar y guardar los datos recolectados, necesitamos acceso al almacenamiento del dispositivo.',
-    );
-  }
-
-  Future<void> _showLocationAlwaysInstructions() async {
-    return PermissionService.showLocationAlwaysExplanation(context);
-  }
-
-  void _showLocationPermissionRequiredDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.location_off, color: Colors.red, size: 28),
-              SizedBox(width: 8),
-              Text('Permisos de Ubicación Requeridos'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Para que la aplicación funcione correctamente, necesita acceso a la ubicación.',
-                style: TextStyle(fontSize: 16),
-              ),
-              SizedBox(height: 16),
-              Text(
-                '🎯 Funciones afectadas sin permisos:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Text('• Recolección de datos GPS'),
-              Text('• Servicios en segundo plano'),
-              Text('• Exportación de datos completos'),
-              SizedBox(height: 16),
-              Text(
-                'Por favor, concede los permisos en la siguiente pantalla.',
-                style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Intentar solicitar permisos de nuevo
-                _retryLocationPermissions();
-              },
-              child: Text('Reintentar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                openAppSettings();
-              },
-              child: Text('Abrir Configuración'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _retryLocationPermissions() async {
-    print('🔄 Reintentando permisos de ubicación...');
-    bool success = await PermissionService.requestLocationPermissionsStepByStep();
-    
-    if (success) {
-      print('✅ Permisos obtenidos en el reintento');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Permisos de ubicación concedidos'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      print('❌ Permisos aún no concedidos');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Permisos de ubicación requeridos para funcionalidad completa'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-
-  void _showLocationServiceDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Servicios de Ubicación'),
-          content: Text(
-            'Los servicios de ubicación están desactivados. '
-            'Por favor, actívalos para obtener datos GPS precisos.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Geolocator.openLocationSettings();
-              },
-              child: Text('Abrir Configuración'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _startRecording() async {
     if (_isRecording) return;
 
@@ -576,11 +260,36 @@ class _SensorHomePageState extends State<SensorHomePage> {
     // Verificar permisos de almacenamiento
     final hasStoragePermission = await PermissionService.hasStoragePermission();
     if (!hasStoragePermission) {
-      _showStoragePermissionDialog();
+      print('⚠️ Sin permisos de almacenamiento para exportar');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Se requieren permisos de almacenamiento para exportar datos')),
+      );
       return;
     }
 
     try {
+      // Obtener datos para contar muestras
+      final data = await DatabaseService.getData(sessionId: _currentSessionId);
+      
+      if (data.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No hay datos para exportar en esta sesión'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Mostrar diálogo de selección de formato
+      final selectedFormat = await showExportFormatDialog(
+        context,
+        sessionId: _currentSessionId!,
+        totalSamples: data.length,
+      );
+      
+      if (selectedFormat == null) return; // Usuario canceló
+
       // Mostrar diálogo de carga
       showDialog(
         context: context,
@@ -598,7 +307,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
                     Text('Exportando datos...'),
                     SizedBox(height: 4),
                     Text(
-                      'Generando archivo CSV',
+                      'Generando archivo ${selectedFormat.name.toUpperCase()}',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
@@ -609,60 +318,53 @@ class _SensorHomePageState extends State<SensorHomePage> {
         ),
       );
 
-      // Procesar datos en lotes para evitar sobrecarga de memoria
       print('🔄 Iniciando exportación para sesión: $_currentSessionId');
-      final data = await DatabaseService.getData(sessionId: _currentSessionId);
       print('📊 Total de registros a exportar: ${data.length}');
-      
-      if (data.isEmpty) {
-        Navigator.pop(context); // Cerrar diálogo de carga
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No hay datos para exportar en esta sesión'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
+      print('📁 Formato seleccionado: ${selectedFormat.name.toUpperCase()}');
 
-      // Crear CSV de manera más eficiente
+      // Obtener metadatos del dispositivo
+      final metadata = await DeviceInfoService.getExportMetadata(
+        _currentSessionId!,
+        data.length,
+      );
+
+      // Crear nombre de archivo con timestamp
       final now = DateTime.now();
-      final fileName = 'sensor_data_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}.csv';
+      final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+      final fileName = selectedFormat == ExportFormat.csv
+          ? 'sensor_data_$dateStr.csv'
+          : 'sensor_data_$dateStr.json';
 
-      // Generar contenido CSV en chunks para evitar problemas de memoria
-      String csvContent = '';
-      csvContent += '# Datos de Sensores - Sensor Data Collector Pro\n';
-      csvContent += '# Sesión: $_currentSessionId\n';
-      csvContent += '# Fecha de exportación: ${DateTime.now().toIso8601String()}\n';
-      csvContent += '# Total de registros: ${data.length}\n';
-      csvContent += '# Frecuencia de muestreo: $_samplingRate Hz\n';
-      csvContent += '#\n';
-      csvContent += 'timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,gps_lat,gps_lng,gps_accuracy,gps_speed,gps_altitude,gps_heading\n';
+      String fileContent = '';
       
-      // Procesar datos en lotes más pequeños para evitar problemas de memoria
-      const batchSize = 50; // Reducido de 100 a 50 para mayor estabilidad
-      final buffer = StringBuffer();
-      
-      for (int i = 0; i < data.length; i += batchSize) {
-        final endIndex = (i + batchSize < data.length) ? i + batchSize : data.length;
-        final batch = data.sublist(i, endIndex);
+      if (selectedFormat == ExportFormat.csv) {
+        // Generar CSV con metadatos completos
+        fileContent = DeviceInfoService.generateCsvHeader(metadata);
         
-        // Procesar el lote actual
-        for (var row in batch) {
-          buffer.writeln('${row['timestamp']},${row['acc_x'] ?? ''},${row['acc_y'] ?? ''},${row['acc_z'] ?? ''},${row['gyro_x'] ?? ''},${row['gyro_y'] ?? ''},${row['gyro_z'] ?? ''},${row['gps_lat'] ?? ''},${row['gps_lng'] ?? ''},${row['gps_accuracy'] ?? ''},${row['gps_speed'] ?? ''},${row['gps_altitude'] ?? ''},${row['gps_heading'] ?? ''}');
+        // Procesar datos en lotes para evitar problemas de memoria
+        const batchSize = 50;
+        final buffer = StringBuffer();
+        
+        for (int i = 0; i < data.length; i += batchSize) {
+          final endIndex = (i + batchSize < data.length) ? i + batchSize : data.length;
+          final batch = data.sublist(i, endIndex);
+          
+          for (var row in batch) {
+            buffer.writeln('${row['timestamp']},${row['acc_x'] ?? ''},${row['acc_y'] ?? ''},${row['acc_z'] ?? ''},${row['gyro_x'] ?? ''},${row['gyro_y'] ?? ''},${row['gyro_z'] ?? ''},${row['gps_lat'] ?? ''},${row['gps_lng'] ?? ''},${row['gps_accuracy'] ?? ''},${row['gps_speed'] ?? ''},${row['gps_altitude'] ?? ''},${row['gps_heading'] ?? ''},${row['session_id'] ?? ''}');
+          }
+          
+          fileContent += buffer.toString();
+          buffer.clear();
+          await Future.delayed(Duration(milliseconds: 20));
+          
+          if (i % (batchSize * 10) == 0) {
+            print('📈 Procesando: ${(i / data.length * 100).toInt()}% completado');
+          }
         }
-        
-        // Agregar al contenido principal y limpiar buffer
-        csvContent += buffer.toString();
-        buffer.clear();
-        
-        // Dar más tiempo al sistema para procesar y liberar memoria
-        await Future.delayed(Duration(milliseconds: 20));
-        
-        // Actualizar progreso cada 10 lotes
-        if (i % (batchSize * 10) == 0) {
-          print('📈 Procesando: ${(i / data.length * 100).toInt()}% completado');
-        }
+      } else {
+        // Generar JSON con estructura completa
+        final jsonData = DeviceInfoService.generateJsonExport(metadata, data);
+        fileContent = JsonEncoder.withIndent('  ').convert(jsonData);
       }
 
       // Intentar guardar en múltiples ubicaciones
@@ -672,7 +374,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
         // 1. Directorio de documentos de la app
         final appDir = await getApplicationDocumentsDirectory();
         final appFile = File('${appDir.path}/$fileName');
-        await appFile.writeAsString(csvContent);
+        await appFile.writeAsString(fileContent);
         savedFiles.add(appFile);
         print('✅ Archivo guardado en app documents: ${appFile.path}');
       } catch (e) {
@@ -683,16 +385,15 @@ class _SensorHomePageState extends State<SensorHomePage> {
         // 2. Directorio de Downloads (si es posible)
         final externalDir = await getExternalStorageDirectory();
         if (externalDir != null) {
-          // Crear directorio personalizado en Downloads
           final downloadsPath = externalDir.path.replaceAll('Android/data/com.example.test1/files', 'Download');
-          final downloadsDir = Directory('$downloadsPath/SensorDataCollector');
+          final downloadsDir = Directory('$downloadsPath/RecWay_SensorData');
           
           if (!await downloadsDir.exists()) {
             await downloadsDir.create(recursive: true);
           }
           
           final downloadsFile = File('${downloadsDir.path}/$fileName');
-          await downloadsFile.writeAsString(csvContent);
+          await downloadsFile.writeAsString(fileContent);
           savedFiles.add(downloadsFile);
           print('✅ Archivo guardado en Downloads: ${downloadsFile.path}');
         }
