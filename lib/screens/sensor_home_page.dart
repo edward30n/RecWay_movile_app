@@ -55,7 +55,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
   }
 
   Future<void> _initializeApp() async {
-    print('🚀 === INICIANDO APLICACIÓN ===');
+    //print('🚀 === INICIANDO APLICACIÓN ===');
     
     // Verificar estado final de permisos (ya fueron solicitados en main.dart)
     await PermissionService.checkAndLogAllPermissions();
@@ -64,7 +64,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
     await _requestBatteryOptimizationPermission();
     await _initializeNativeSensors();
     
-    print('✅ === SENSOR HOME INICIALIZADA ===');
+    //print('✅ === SENSOR HOME INICIALIZADA ===');
   }
   void _startRecording() async {
     if (_isRecording) return;
@@ -79,7 +79,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
 
     // ACTIVAR WAKELOCK PARA MANTENER SENSORES ACTIVOS
     await WakelockPlus.enable();
-    print('🔋 WakeLock activado en app principal');
+    //print('🔋 WakeLock activado en app principal');
 
     // Iniciar timer para el tiempo de grabación
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
@@ -114,7 +114,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
         // No guardamos aquí, el timer se encarga de eso
       },
       onError: (error) {
-        print('Error GPS: $error');
+        //print('Error GPS: $error');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error GPS: $error')),
         );
@@ -130,7 +130,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
           _currentAccelerometer = event;
         });
         // Log para verificar que los datos cambian
-        print('📱 APP Accel: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
+       // print('📱 APP Accel: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
       },
     );
 
@@ -142,7 +142,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
           _currentGyroscope = event;
         });
         // Log para verificar que los datos cambian
-        print('📱 APP Gyro: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
+        //print('📱 APP Gyro: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
       },
     );
 

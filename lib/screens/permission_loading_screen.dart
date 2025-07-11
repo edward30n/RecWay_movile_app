@@ -18,38 +18,22 @@ class PermissionLoadingScreen extends StatefulWidget {
 
 class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
     with TickerProviderStateMixin {
-  late AnimationController _spinController;
   late AnimationController _pulseController;
-  late Animation<double> _spinAnimation;
   late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
-    
-    // Animación de rotación
-    _spinController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat();
-    
-    _spinAnimation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(
-      parent: _spinController,
-      curve: Curves.linear,
-    ));
 
-    // Animación de pulso
+    // Animación de pulso más sutil
     _pulseController = AnimationController(
       duration: const Duration(seconds: 1),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
+      begin: 0.9,
+      end: 1.1,
     ).animate(CurvedAnimation(
       parent: _pulseController,
       curve: Curves.easeInOut,
@@ -58,7 +42,6 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
 
   @override
   void dispose() {
-    _spinController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
@@ -90,41 +73,38 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                   // Logo/Icono animado
                   ScaleTransition(
                     scale: _pulseAnimation,
-                    child: RotationTransition(
-                      turns: _spinAnimation,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF4FACFE),
-                              Color(0xFF00F2FE),
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF4FACFE).withOpacity(0.3),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF4FACFE),
+                            Color(0xFF00F2FE),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.sensors,
-                          size: 60,
-                          color: Colors.white,
-                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4FACFE).withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.sensors,
+                        size: 60,
+                        color: Colors.white,
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 40),
-                  
+
                   // Título
                   const Text(
-                    'RecWay Sensores',
+                    'RecWay',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -132,9 +112,9 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                       letterSpacing: 1.2,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Subtítulo
                   Text(
                     'Configurando aplicación...',
@@ -144,9 +124,9 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                       fontWeight: FontWeight.w300,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 60),
-                  
+
                   // Barra de progreso
                   Container(
                     width: double.infinity,
@@ -166,9 +146,9 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Porcentaje
                   Text(
                     '${(widget.progress * 100).toInt()}%',
@@ -178,9 +158,9 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                       color: Color(0xFF4FACFE),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 40),
-                  
+
                   // Paso actual
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -214,68 +194,6 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                         ),
                       ],
                     ),
-                  ),
-                  
-                  const SizedBox(height: 60),
-                  
-                  // Mensaje informativo
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: const Color(0xFF4FACFE).withOpacity(0.1),
-                      border: Border.all(
-                        color: const Color(0xFF4FACFE).withOpacity(0.3),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          color: Color(0xFF4FACFE),
-                          size: 28,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'La aplicación necesita configurar permisos para acceder a sensores, GPS y almacenamiento. Este proceso puede tomar unos momentos.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white.withOpacity(0.9),
-                            height: 1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const Spacer(),
-                  
-                  // Indicador de carga alternativo
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(3, (index) {
-                      return AnimatedBuilder(
-                        animation: _spinController,
-                        builder: (context, child) {
-                          double delay = index * 0.3;
-                          double animationValue = (_spinController.value + delay) % 1.0;
-                          double opacity = (animationValue < 0.5) ? 
-                            (animationValue * 2) : 
-                            (2 - animationValue * 2);
-                          
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF4FACFE).withOpacity(opacity),
-                            ),
-                          );
-                        },
-                      );
-                    }),
                   ),
                 ],
               ),
