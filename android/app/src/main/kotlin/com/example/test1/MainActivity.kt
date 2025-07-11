@@ -13,6 +13,8 @@ import android.os.Build
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -37,6 +39,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        
+        // Crear canal de notificación para el servicio en primer plano
+        createNotificationChannel()
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -171,6 +176,26 @@ class MainActivity : FlutterActivity() {
             intent.action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
             intent.data = Uri.parse("package:$packageName")
             startActivity(intent)
+        }
+    }
+    
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channelId = "sensor_data_collector"
+            val channelName = "Sensor Data Collector"
+            val channelDescription = "Canal para el servicio de recolección de datos de sensores"
+            val importance = NotificationManager.IMPORTANCE_LOW
+            
+            val channel = NotificationChannel(channelId, channelName, importance).apply {
+                description = channelDescription
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
+            }
+            
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
         }
     }
     

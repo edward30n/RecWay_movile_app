@@ -33,3 +33,36 @@
 
 # Sensor data
 -keep class com.example.test1.** { *; }
+
+# Google Play Core - Fix for missing classes
+-dontwarn com.google.android.play.core.**
+-dontwarn com.google.android.play.core.splitcompat.**
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
+
+# Flutter deferred components - these are optional features
+-dontwarn io.flutter.embedding.engine.deferredcomponents.**
+-dontwarn io.flutter.embedding.android.FlutterPlayStoreSplitApplication
+
+# Since we're not using Play Core features, we can safely ignore these
+
+# Keep native methods
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# Keep sensor and location services
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+
+# Keep background service classes
+-keep class androidx.work.** { *; }
+-dontwarn androidx.work.**
+
+# Keep permission handler
+-keep class com.baseflow.permissionhandler.** { *; }
+-dontwarn com.baseflow.permissionhandler.**
+
+# Keep geolocator
+-keep class com.baseflow.geolocator.** { *; }
+-dontwarn com.baseflow.geolocator.**
