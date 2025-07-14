@@ -33,3 +33,21 @@
 
 # Sensor data
 -keep class com.example.test1.** { *; }
+
+# Google Play Core - Fix for missing classes
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
+
+# Flutter Engine Play Store Support
+-keep class io.flutter.embedding.android.FlutterPlayStoreSplitApplication { *; }
+-keep class io.flutter.embedding.engine.deferredcomponents.** { *; }
+
+# Keep all annotations
+-keepattributes *Annotation*
+
+# Keep generic signature of Call, Response (R8 full mode strips signatures from non-kept items).
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+
+# Keep R8 warnings quiet
+-dontwarn java.lang.invoke.StringConcatFactory

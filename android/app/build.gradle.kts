@@ -43,6 +43,13 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    
+    packagingOptions {
+        pickFirst("**/armeabi-v7a/libc++_shared.so")
+        pickFirst("**/arm64-v8a/libc++_shared.so")
+        pickFirst("**/x86/libc++_shared.so")
+        pickFirst("**/x86_64/libc++_shared.so")
+    }
 }
 
 flutter {
@@ -53,4 +60,8 @@ dependencies {
     implementation("androidx.window:window:1.2.0")
     implementation("androidx.window:window-java:1.2.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    
+    // Google Play Core for Flutter Engine compatibility
+    implementation("com.google.android.play:core:1.10.3")
+    implementation("com.google.android.play:core-ktx:1.8.1")
 }
