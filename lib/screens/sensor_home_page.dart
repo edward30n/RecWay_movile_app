@@ -16,7 +16,12 @@ import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
 
 class SensorHomePage extends StatefulWidget {
-  const SensorHomePage({super.key});
+  final bool skipInitialization;
+  
+  const SensorHomePage({
+    super.key,
+    this.skipInitialization = false,
+  });
 
   @override
   _SensorHomePageState createState() => _SensorHomePageState();
@@ -48,7 +53,11 @@ class _SensorHomePageState extends State<SensorHomePage> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    if (!widget.skipInitialization) {
+      _initializeApp();
+    } else {
+      print('🔄 Saltando inicialización - ya completada en splash screen');
+    }
   }
 
   Future<void> _initializeApp() async {

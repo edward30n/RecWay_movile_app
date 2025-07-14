@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/sensor_home_page.dart';
+import 'screens/splash_screen.dart';
 import 'services/background_service.dart';
 
 void main() async {
@@ -32,7 +32,7 @@ class MyApp extends StatelessWidget {
           elevation: 2,
         ),
       ),
-      home: SensorHomePage(),
+      home: SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
