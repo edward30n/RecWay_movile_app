@@ -11,9 +11,11 @@ import 'dart:io';
 import '../services/database_service.dart';
 import '../services/permission_service.dart';
 import '../services/native_sensor_service.dart';
+import '../services/sensor_diagnostic_service.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
+import 'emergency_error_screen.dart';
 
 class SensorHomePage extends StatefulWidget {
   final bool skipInitialization;
@@ -1067,6 +1069,230 @@ class _SensorHomePageState extends State<SensorHomePage> {
     );
   }
 
+  /// Diagnóstico avanzado de sensores
+  Future<void> _performSensorDiagnostic() async {
+    setState(() {
+      _isRecording = false;
+    });
+
+    // Detener cualquier grabación activa
+    _stopRecording();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.sensors, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('🔬 Diagnóstico de Sensores'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Analizando sensores...\n\n'
+              'Por favor, mueve ligeramente el dispositivo\n'
+              'durante los próximos 5 segundos.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Realizar diagnóstico completo
+      final sensorTest = await SensorDiagnosticService.testSensorValues();
+      final gyroZeroTest = await SensorDiagnosticService.diagnoseGyroscopeZeros();
+      
+      Navigator.pop(context); // Cerrar diálogo de progreso
+      
+      // Mostrar resultados
+      _showDiagnosticResults(sensorTest, gyroZeroTest);
+      
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error durante diagnóstico: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showDiagnosticResults(Map<String, dynamic> sensorTest, Map<String, dynamic> gyroTest) {
+    final isWorking = sensorTest['isWorking'] as bool? ?? false;
+    final problems = sensorTest['problems'] as List<String>? ?? [];
+    final gyroStuckAtZero = gyroTest['isGyroscopeStuckAtZero'] as bool? ?? false;
+    final recommendations = gyroTest['recommendations'] as List<String>? ?? [];
+    
+    final accelData = sensorTest['accelerometer'] as Map<String, dynamic>? ?? {};
+    final gyroData = sensorTest['gyroscope'] as Map<String, dynamic>? ?? {};
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              isWorking ? Icons.check_circle : Icons.error,
+              color: isWorking ? Colors.green : Colors.red,
+            ),
+            SizedBox(width: 8),
+            Text(isWorking ? '✅ Sensores OK' : '❌ Problemas Detectados'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '📊 Resultados del Análisis:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 12),
+              
+              // Estado del acelerómetro
+              _buildSensorStatus(
+                '📱 Acelerómetro',
+                accelData['isResponsive'] as bool? ?? false,
+                accelData['samplesCount'] as int? ?? 0,
+                accelData['hasVariation'] as bool? ?? false,
+              ),
+              
+              SizedBox(height: 8),
+              
+              // Estado del giroscopio
+              _buildSensorStatus(
+                '🌀 Giroscopio',
+                gyroData['isResponsive'] as bool? ?? false,
+                gyroData['samplesCount'] as int? ?? 0,
+                gyroData['hasVariation'] as bool? ?? false,
+                extraInfo: gyroStuckAtZero ? 'VALORES EN CERO DETECTADOS' : null,
+              ),
+              
+              if (problems.isNotEmpty) ...[
+                SizedBox(height: 16),
+                Text(
+                  '⚠️ Problemas encontrados:',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                ),
+                SizedBox(height: 8),
+                ...problems.map((problem) => Padding(
+                  padding: EdgeInsets.only(left: 16, bottom: 4),
+                  child: Text('• $problem', style: TextStyle(color: Colors.red.shade700)),
+                )),
+              ],
+              
+              if (recommendations.isNotEmpty) ...[
+                SizedBox(height: 16),
+                Text(
+                  '💡 Recomendaciones:',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                ),
+                SizedBox(height: 8),
+                ...recommendations.map((rec) => Padding(
+                  padding: EdgeInsets.only(left: 16, bottom: 4),
+                  child: Text('• $rec', style: TextStyle(color: Colors.blue.shade700)),
+                )),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          if (!isWorking)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showEmergencyScreen();
+              },
+              child: Text('Arreglar Problemas'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cerrar'),
+          ),
+          if (!isWorking)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _performSensorDiagnostic(); // Repetir diagnóstico
+              },
+              child: Text('Probar de Nuevo'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSensorStatus(String name, bool isResponsive, int samples, bool hasVariation, {String? extraInfo}) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isResponsive ? Colors.green.shade50 : Colors.red.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isResponsive ? Colors.green.shade200 : Colors.red.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isResponsive ? Icons.check_circle : Icons.error,
+                color: isResponsive ? Colors.green : Colors.red,
+                size: 20,
+              ),
+              SizedBox(width: 8),
+              Text(
+                name,
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          SizedBox(height: 4),
+          Text('Muestras: $samples'),
+          Text('Variación: ${hasVariation ? 'SÍ' : 'NO'}'),
+          if (extraInfo != null) ...[
+            SizedBox(height: 4),
+            Text(
+              extraInfo,
+              style: TextStyle(
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showEmergencyScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EmergencyErrorScreen(
+          errorMessage: 'Problemas críticos con sensores detectados. Los sensores no están respondiendo correctamente.',
+          onRetry: () {
+            Navigator.pop(context);
+            _performSensorDiagnostic();
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1084,6 +1310,26 @@ class _SensorHomePageState extends State<SensorHomePage> {
               dataCount: _dataCount,
               samplingRate: _samplingRate,
               isRecording: _isRecording,
+            ),
+            
+            SizedBox(height: 16),
+            
+            // Botón de Diagnóstico
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isRecording ? null : _performSensorDiagnostic,
+                icon: Icon(Icons.medical_services),
+                label: Text('🔬 Diagnóstico de Sensores'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
             ),
             
             SizedBox(height: 24),

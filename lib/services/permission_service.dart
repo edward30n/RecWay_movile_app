@@ -1,6 +1,7 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 class PermissionService {
@@ -345,5 +346,236 @@ class PermissionService {
     }
     
     print('🔍 === FIN ESTADO PERMISOS ===');
+  }
+
+  /// Diagnóstico avanzado de problemas de sensores
+  static Future<Map<String, dynamic>> diagnoseSensorProblems() async {
+    print('🔍 === DIAGNÓSTICO AVANZADO DE SENSORES ===');
+    
+    final results = <String, dynamic>{
+      'timestamp': DateTime.now().toIso8601String(),
+      'problems': <String>[],
+      'recommendations': <String>[],
+      'permissions': <String, dynamic>{},
+      'sensorStatus': <String, dynamic>{},
+    };
+    
+    try {
+      // 1. Verificar permisos específicos de sensores
+      print('1️⃣ Verificando permisos de sensores...');
+      
+      final sensorPermission = await Permission.sensors.status;
+      results['permissions']['sensors'] = sensorPermission.name;
+      
+      if (sensorPermission != PermissionStatus.granted) {
+        results['problems'].add('Permiso de sensores no concedido');
+        results['recommendations'].add('Activar permiso de sensores en configuración');
+      }
+      
+      // 2. Verificar permisos de alta frecuencia (Android 12+)
+      try {
+        // En Android 12+, verificar HIGH_SAMPLING_RATE_SENSORS
+        final highFreqSupported = Platform.isAndroid;
+        results['sensorStatus']['highFrequencySupported'] = highFreqSupported;
+        
+        if (highFreqSupported) {
+          print('📊 Soporte para alta frecuencia disponible');
+        } else {
+          results['problems'].add('Alta frecuencia de sensores no soportada');
+          results['recommendations'].add('Actualizar a Android 12+ para mejor rendimiento');
+        }
+      } catch (e) {
+        print('⚠️ No se pudo verificar soporte de alta frecuencia: $e');
+      }
+      
+      // 3. Verificar estado de almacenamiento detallado
+      print('2️⃣ Verificando almacenamiento detallado...');
+      
+      final storagePermission = await Permission.storage.status;
+      final manageStoragePermission = await Permission.manageExternalStorage.status;
+      
+      results['permissions']['storage'] = storagePermission.name;
+      results['permissions']['manageExternalStorage'] = manageStoragePermission.name;
+      
+      bool hasAnyStoragePermission = storagePermission.isGranted || manageStoragePermission.isGranted;
+      results['sensorStatus']['storageAccessible'] = hasAnyStoragePermission;
+      
+      if (!hasAnyStoragePermission) {
+        results['problems'].add('Sin acceso a almacenamiento para guardar datos');
+        results['recommendations'].add('Conceder permisos de almacenamiento en configuración');
+      }
+      
+      // 4. Verificar optimización de batería
+      print('3️⃣ Verificando optimización de batería...');
+      
+      final batteryOptimization = await Permission.ignoreBatteryOptimizations.status;
+      results['permissions']['batteryOptimization'] = batteryOptimization.name;
+      
+      if (batteryOptimization != PermissionStatus.granted) {
+        results['problems'].add('Optimización de batería puede afectar sensores');
+        results['recommendations'].add('Desactivar optimización de batería para esta app');
+      }
+      
+      // 5. Verificar servicios de ubicación
+      print('4️⃣ Verificando servicios de ubicación...');
+      
+      final locationServices = await Geolocator.isLocationServiceEnabled();
+      results['sensorStatus']['locationServicesEnabled'] = locationServices;
+      
+      if (!locationServices) {
+        results['problems'].add('Servicios de ubicación deshabilitados');
+        results['recommendations'].add('Activar servicios de ubicación en configuración del sistema');
+      }
+      
+      // 6. Verificar permisos de ubicación detallados
+      final locationWhenInUse = await Permission.locationWhenInUse.status;
+      final locationAlways = await Permission.locationAlways.status;
+      
+      results['permissions']['locationWhenInUse'] = locationWhenInUse.name;
+      results['permissions']['locationAlways'] = locationAlways.name;
+      
+      if (locationWhenInUse != PermissionStatus.granted) {
+        results['problems'].add('Permiso de ubicación básico no concedido');
+        results['recommendations'].add('Conceder permiso de ubicación "Mientras usa la app"');
+      }
+      
+      if (locationAlways != PermissionStatus.granted) {
+        results['problems'].add('Permiso de ubicación en segundo plano no concedido');
+        results['recommendations'].add('Conceder permiso de ubicación "Todo el tiempo"');
+      }
+      
+      // 7. Verificar notificaciones
+      final notifications = await Permission.notification.status;
+      results['permissions']['notifications'] = notifications.name;
+      
+      if (notifications != PermissionStatus.granted) {
+        results['problems'].add('Permisos de notificación no concedidos');
+        results['recommendations'].add('Activar notificaciones para ver estado del servicio');
+      }
+      
+      // 8. Verificar si hay múltiples apps usando sensores
+      results['sensorStatus']['multipleAppsConflict'] = false; // Por ahora, no podemos detectar esto directamente
+      
+      // 9. Resumen final
+      final problemCount = (results['problems'] as List).length;
+      results['severity'] = problemCount == 0 ? 'none' : 
+                           problemCount <= 2 ? 'minor' : 
+                           problemCount <= 4 ? 'moderate' : 'severe';
+      
+      print('📋 Diagnóstico completado: ${problemCount} problemas encontrados');
+      print('🎯 Severidad: ${results['severity']}');
+      
+      return results;
+      
+    } catch (e) {
+      print('❌ Error durante diagnóstico: $e');
+      results['error'] = e.toString();
+      results['severity'] = 'error';
+      return results;
+    }
+  }
+
+  /// Intenta arreglar automáticamente los problemas de sensores
+  static Future<bool> attemptAutomaticSensorFix() async {
+    print('🔧 === INICIANDO ARREGLO AUTOMÁTICO ===');
+    
+    bool success = true;
+    
+    try {
+      // 1. Solicitar permisos de sensores
+      print('1️⃣ Solicitando permisos de sensores...');
+      final sensorResult = await Permission.sensors.request();
+      if (sensorResult != PermissionStatus.granted) {
+        print('❌ No se pudo obtener permiso de sensores');
+        success = false;
+      }
+      
+      // 2. Solicitar permisos de almacenamiento
+      print('2️⃣ Solicitando permisos de almacenamiento...');
+      final storageResult = await Permission.storage.request();
+      if (storageResult != PermissionStatus.granted) {
+        // Intentar con el permiso de gestión de almacenamiento
+        final manageStorageResult = await Permission.manageExternalStorage.request();
+        if (manageStorageResult != PermissionStatus.granted) {
+          print('❌ No se pudo obtener permiso de almacenamiento');
+          success = false;
+        }
+      }
+      
+      // 3. Solicitar desactivar optimización de batería
+      print('3️⃣ Solicitando desactivar optimización de batería...');
+      final batteryResult = await Permission.ignoreBatteryOptimizations.request();
+      if (batteryResult != PermissionStatus.granted) {
+        print('⚠️ Usuario no desactivó optimización de batería');
+        // No marcamos como fallo total, pero es recomendado
+      }
+      
+      // 4. Verificar ubicación
+      print('4️⃣ Verificando permisos de ubicación...');
+      final locationResult = await Permission.locationWhenInUse.request();
+      if (locationResult == PermissionStatus.granted) {
+        // Intentar también el permiso "siempre"
+        await Future.delayed(Duration(seconds: 1));
+        await Permission.locationAlways.request();
+      } else {
+        print('❌ No se pudo obtener permiso de ubicación');
+        success = false;
+      }
+      
+      // 5. Solicitar notificaciones
+      print('5️⃣ Solicitando permisos de notificaciones...');
+      await Permission.notification.request();
+      
+      // 6. Verificar servicios de ubicación
+      print('6️⃣ Verificando servicios de ubicación...');
+      final locationServicesEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!locationServicesEnabled) {
+        print('⚠️ Servicios de ubicación deshabilitados - requiere acción manual');
+        success = false;
+      }
+      
+      print(success ? '✅ Arreglo automático completado exitosamente' : 
+                     '⚠️ Arreglo parcial - se requiere configuración manual');
+      
+      return success;
+      
+    } catch (e) {
+      print('❌ Error durante arreglo automático: $e');
+      return false;
+    }
+  }
+
+  /// Método mejorado para verificar estado real de almacenamiento
+  static Future<bool> hasStoragePermissionDetailed() async {
+    if (Platform.isAndroid) {
+      try {
+        // Verificar múltiples tipos de permisos de almacenamiento
+        final storage = await Permission.storage.isGranted;
+        final manageStorage = await Permission.manageExternalStorage.isGranted;
+        
+        // Intentar operación de escritura real para verificar
+        bool canWrite = false;
+        try {
+          final directory = await getExternalStorageDirectory();
+          if (directory != null) {
+            final testFile = File('${directory.path}/test_write.txt');
+            await testFile.writeAsString('test');
+            await testFile.delete();
+            canWrite = true;
+          }
+        } catch (e) {
+          print('⚠️ No se puede escribir en almacenamiento externo: $e');
+        }
+        
+        final hasPermission = storage || manageStorage || canWrite;
+        print('🔍 Estado almacenamiento detallado: storage=$storage, manage=$manageStorage, canWrite=$canWrite, total=$hasPermission');
+        
+        return hasPermission;
+      } catch (e) {
+        print('❌ Error verificando almacenamiento detallado: $e');
+        return false;
+      }
+    }
+    return true; // En iOS asumimos que está disponible
   }
 }

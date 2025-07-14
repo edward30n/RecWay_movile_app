@@ -9,29 +9,59 @@ import 'database_service.dart';
 import 'native_sensor_service.dart';
 
 Future<void> initializeService() async {
-  final service = FlutterBackgroundService();
-  
-  await service.configure(
-    androidConfiguration: AndroidConfiguration(
-      onStart: onStart,
-      autoStart: true,
-      isForegroundMode: true,
-      notificationChannelId: 'sensor_data_collector',
-      initialNotificationTitle: 'Sensor Data Collector Pro',
-      initialNotificationContent: 'Recolectando datos en segundo plano...',
-      foregroundServiceNotificationId: 888,
-    ),
-    iosConfiguration: IosConfiguration(
-      autoStart: true,
-      onForeground: onStart,
-      onBackground: onIosBackground,
-    ),
-  );
+  try {
+    final service = FlutterBackgroundService();
+    
+    // Verificar si ya está configurado
+    final isRunning = await service.isRunning();
+    if (isRunning) {
+      print('✅ Servicio ya está ejecutándose, saltando configuración');
+      return;
+    }
+    
+    print('🔧 Configurando servicio de background...');
+    
+    await service.configure(
+      androidConfiguration: AndroidConfiguration(
+        onStart: onStart,
+        autoStart: false, // Cambiar a false para control manual
+        isForegroundMode: true,
+        notificationChannelId: 'sensor_data_collector',
+        initialNotificationTitle: 'Sensor Data Collector Pro',
+        initialNotificationContent: 'Recolectando datos en segundo plano...',
+        foregroundServiceNotificationId: 888,
+      ),
+      iosConfiguration: IosConfiguration(
+        autoStart: false, // Cambiar a false para control manual
+        onForeground: onStart,
+        onBackground: onIosBackground,
+      ),
+    );
+    
+    // Iniciar manualmente después de configurar
+    print('🚀 Iniciando servicio manualmente...');
+    await service.startService();
+    
+    print('✅ Servicio configurado e iniciado correctamente');
+  } catch (e) {
+    print('❌ Error inicializando servicio: $e');
+    throw e;
+  }
 }
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+  
+  // INMEDIATAMENTE configurar como servicio de primer plano
+  if (service is AndroidServiceInstance) {
+    try {
+      await service.setAsForegroundService();
+      print('✅ Servicio configurado como foreground service');
+    } catch (e) {
+      print('⚠️ Error configurando foreground service: $e');
+    }
+  }
   
   // ACTIVAR WAKELOCK PARA MANTENER CPU ACTIVO
   await WakelockPlus.enable();

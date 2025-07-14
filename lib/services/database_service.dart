@@ -152,4 +152,54 @@ class DatabaseService {
       'duration': startTime != null && endTime != null ? endTime - startTime : 0,
     };
   }
+
+  // Método para verificar la salud de la base de datos
+  static Future<bool> isDatabaseHealthy() async {
+    try {
+      final db = await database;
+      
+      // Verificar si la tabla existe y es accesible
+      final result = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='$_tableName'"
+      );
+      
+      if (result.isEmpty) {
+        print('⚠️ Tabla de base de datos no encontrada, recreando...');
+        await _createTables(db);
+      }
+      
+      // Probar una consulta simple
+      await db.rawQuery('SELECT COUNT(*) FROM $_tableName LIMIT 1');
+      
+      print('✅ Base de datos saludable');
+      return true;
+    } catch (e) {
+      print('❌ Error verificando salud de base de datos: $e');
+      return false;
+    }
+  }
+
+  // Método para limpiar sesiones abiertas en caso de crash
+  static Future<void> cleanupOpenSessions() async {
+    try {
+      final db = await database;
+      
+      // Verificar si hay sesiones que no se cerraron correctamente
+      final openSessions = await db.rawQuery('''
+        SELECT DISTINCT session_id 
+        FROM $_tableName 
+        WHERE session_id IS NOT NULL 
+        ORDER BY timestamp DESC 
+        LIMIT 10
+      ''');
+      
+      if (openSessions.isNotEmpty) {
+        print('🧹 Encontradas ${openSessions.length} sesiones previas');
+        // Opcional: aquí podrías marcar sesiones como cerradas o limpiarlas
+      }
+      
+    } catch (e) {
+      print('⚠️ Error limpiando sesiones abiertas: $e');
+    }
+  }
 }
