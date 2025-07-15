@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:io';
 import '../services/database_service.dart';
 import '../services/permission_service.dart';
+import '../services/device_info_service.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
@@ -50,6 +51,16 @@ class _SensorHomePageState extends State<SensorHomePage> {
   GyroscopeEvent? _currentGyroscope;
   Position? _currentPosition;
 
+  // Variables para metadata del dispositivo SIMPLIFICADA
+  String _deviceId = '';
+  String _deviceModel = '';
+  String _manufacturer = '';
+  String _platform = '';
+  String _appVersion = '';
+  String _appBuildNumber = '';
+  String _osVersion = '';
+  String _empresa = 'RecWay'; // Nombre de la empresa
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +72,9 @@ class _SensorHomePageState extends State<SensorHomePage> {
   }
 
   Future<void> _initializeApp() async {
+    // Cargar información del dispositivo
+    await _loadDeviceInfo();
+    
     // Verificar si es la primera vez que se abre la app
     final isFirstLaunch = await _isFirstLaunch();
     
@@ -94,6 +108,44 @@ class _SensorHomePageState extends State<SensorHomePage> {
     // Aquí podrías usar SharedPreferences para verificar si es el primer lanzamiento
     // Por simplicidad, siempre mostraremos el diálogo en esta versión
     return true;
+  }
+
+  Future<void> _loadDeviceInfo() async {
+    try {
+      print('🔍 Iniciando carga básica de información del dispositivo...');
+      
+      // Obtener información básica del dispositivo usando el servicio robusto
+      final deviceInfo = await DeviceInfoService.getDeviceInfo();
+      
+      // Asignar solo los valores básicos necesarios para compatibilidad
+      _deviceId = deviceInfo['deviceId'] ?? 'Unknown';
+      _platform = deviceInfo['platform'] ?? 'Unknown';
+      _deviceModel = deviceInfo['deviceModel'] ?? 'Unknown';
+      _manufacturer = deviceInfo['manufacturer'] ?? 'Unknown';
+      _osVersion = deviceInfo['platformVersion'] ?? 'Unknown';
+      _appVersion = deviceInfo['appVersion'] ?? 'Unknown';
+      _appBuildNumber = deviceInfo['buildNumber'] ?? 'Unknown';
+
+      print('✅ Información básica del dispositivo cargada:');
+      print('   - Device ID: $_deviceId');
+      print('   - Platform: $_platform');
+      print('   - Model: $_manufacturer $_deviceModel');
+      print('   - OS: $_osVersion');
+      print('   - App: $_appVersion ($_appBuildNumber)');
+      
+      print('ℹ️ La información completa de sensores se carga automáticamente durante la exportación');
+      
+    } catch (e) {
+      print('❌ Error loading device info: $e');
+      // Valores por defecto en caso de error
+      _platform = 'Error';
+      _deviceModel = 'Error loading';
+      _manufacturer = 'Error loading';
+      _deviceId = 'error_' + DateTime.now().millisecondsSinceEpoch.toString();
+      _osVersion = 'Error loading';
+      _appVersion = 'Error loading';
+      _appBuildNumber = 'Error loading';
+    }
   }
 
   Future<void> _showWelcomeAndPermissionsDialog() async {
@@ -688,21 +740,48 @@ class _SensorHomePageState extends State<SensorHomePage> {
         return;
       }
 
-      // Crear CSV de manera más eficiente
+      // Crear CSV de manera más eficiente con nombre de archivo mejorado
       final now = DateTime.now();
-      final fileName = 'sensor_data_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}.csv';
+      final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+      
+      // Obtener metadatos del dispositivo usando el servicio robusto
+      final exportMetadata = await DeviceInfoService.getExportMetadata(_currentSessionId!, data.length);
+      final deviceIdShort = exportMetadata['deviceId'].toString().length > 8 ? exportMetadata['deviceId'].toString().substring(0, 8) : exportMetadata['deviceId'].toString();
+      final modelShort = exportMetadata['deviceModel'].toString().length > 10 ? exportMetadata['deviceModel'].toString().substring(0, 10).replaceAll(' ', '') : exportMetadata['deviceModel'].toString().replaceAll(' ', '');
+      final fileName = '${_empresa}_${modelShort}_${deviceIdShort}_$timestamp.csv';
 
-      // Generar contenido CSV en chunks para evitar problemas de memoria
+      // Generar header CSV completo usando el servicio
       String csvContent = '';
-      csvContent += '# Datos de Sensores - Sensor Data Collector Pro\n';
-      csvContent += '# Sesión: $_currentSessionId\n';
-      csvContent += '# Fecha de exportación: ${DateTime.now().toIso8601String()}\n';
-      csvContent += '# Total de registros: ${data.length}\n';
-      csvContent += '# Frecuencia de muestreo: $_samplingRate Hz\n';
-      csvContent += '# Formato de datos:\n';
-      csvContent += '#   - Sensores (acc/gyro): 6 decimales de precisión\n';
-      csvContent += '#   - GPS (lat/lng): 8 decimales de precisión\n';
-      csvContent += '#   - Filas incompletas automáticamente removidas\n';
+      csvContent += '# ================================================\n';
+      csvContent += '# RECWAY SENSOR DATA EXPORT - METADATA COMPLETO\n';
+      csvContent += '# ================================================\n';
+      csvContent += '# Device ID: ${exportMetadata['deviceId']}\n';
+      csvContent += '# Session ID: ${exportMetadata['sessionId']}\n';
+      csvContent += '# Platform: ${exportMetadata['platform']}\n';
+      csvContent += '# Device Model: ${exportMetadata['deviceModel']}\n';
+      csvContent += '# Manufacturer: ${exportMetadata['manufacturer']}\n';
+      csvContent += '# Brand: ${exportMetadata['manufacturer']}\n';
+      csvContent += '# OS Version: ${exportMetadata['platformVersion']}\n';
+      csvContent += '# App Version: ${exportMetadata['appVersion']} (${exportMetadata['buildNumber']})\n';
+      csvContent += '# Company: $_empresa\n';
+      csvContent += '# Android ID: ${exportMetadata['deviceId']}\n';
+      csvContent += '# Battery Info: ${exportMetadata['batteryInfo']}\n';
+      csvContent += '# \n';
+      csvContent += '# === INFORMACION DE SENSORES ===\n';
+      csvContent += '# Accelerometer Available: ${exportMetadata['hasAccelerometer']}\n';
+      csvContent += '# Accelerometer Info: ${exportMetadata['accelerometerInfo']}\n';
+      csvContent += '# Gyroscope Available: ${exportMetadata['hasGyroscope']}\n';
+      csvContent += '# Gyroscope Info: ${exportMetadata['gyroscopeInfo']}\n';
+      csvContent += '# GPS Available: ${exportMetadata['hasGPS']}\n';
+      csvContent += '# GPS Info: ${exportMetadata['gpsInfo']}\n';
+      csvContent += '# \n';
+      csvContent += '# === INFORMACION DE GRABACION ===\n';
+      csvContent += '# Export Date: ${DateTime.now().toIso8601String()}\n';
+      csvContent += '# Total Records: ${data.length}\n';
+      csvContent += '# Sampling Rate: $_samplingRate Hz\n';
+      csvContent += '# Recording Duration: ${_formatTime(_recordingTime)}\n';
+      csvContent += '# Average Sample Rate: ${_recordingTime > 0 ? (data.length / _recordingTime).toStringAsFixed(2) : "0"} Hz\n';
+      csvContent += '# ================================================\n';
       csvContent += '#\n';
       csvContent += 'timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,gps_lat,gps_lng,gps_accuracy,gps_speed,gps_altitude,gps_heading\n';
       
@@ -793,23 +872,8 @@ class _SensorHomePageState extends State<SensorHomePage> {
       }
 
       if (savedFiles.isNotEmpty) {
-        // Mostrar información sobre la limpieza de datos
-        final originalCount = data.length;
-        final finalCount = cleanedRows.length;
-        
-        if (originalCount != finalCount) {
-          print('📊 Limpieza de datos: $originalCount registros originales → $finalCount registros finales');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Datos procesados: ${originalCount - finalCount} registros incompletos removidos'),
-              backgroundColor: AppColors.accentBlue,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        
-        // Mostrar opciones de exportación
-        _showExportOptionsDialog(savedFiles, finalCount, fileName);
+        // Mostrar opciones de exportación sin mensajes de validación
+        _showExportOptionsDialog(savedFiles, cleanedRows.length, fileName);
       } else {
         throw Exception('No se pudo guardar el archivo en ninguna ubicación');
       }
@@ -1204,21 +1268,47 @@ class _SensorHomePageState extends State<SensorHomePage> {
     return value.toString();
   }
 
-  /// Formatear valores GPS con mayor precisión (8 decimales para coordenadas)
+  /// Formatear valores GPS manteniendo precisión completa
   String _formatGPSValue(dynamic value) {
     if (value == null) return '';
     if (value is num) {
-      return value.toStringAsFixed(8);
+      // Mantener precisión completa para coordenadas GPS
+      return value.toString();
     }
     return value.toString();
   }
 
-  /// Validar que una fila CSV tenga contenido esencial
+  /// Validar que una fila CSV tenga contenido esencial y esté completa
   bool _isValidCSVRow(String csvRow, Map<String, dynamic> originalRow) {
-    // Verificar que tenga timestamp
+    // Verificar que tenga timestamp válido
     if (originalRow['timestamp'] == null) return false;
     
-    // Verificar que tenga al menos algunos datos de sensores
+    // Verificar que la fila CSV tenga el número correcto de campos
+    final fields = csvRow.split(',');
+    if (fields.length != 13) return false;
+    
+    // Verificar que el timestamp no esté vacío
+    if (fields[0].isEmpty) return false;
+    
+    // Verificar que no haya demasiados campos vacíos consecutivos (como ,,)
+    int consecutiveEmptyFields = 0;
+    int maxConsecutiveEmpty = 0;
+    
+    for (int i = 0; i < fields.length; i++) {
+      if (fields[i].isEmpty || fields[i] == 'null' || fields[i] == '') {
+        consecutiveEmptyFields++;
+        maxConsecutiveEmpty = maxConsecutiveEmpty > consecutiveEmptyFields 
+            ? maxConsecutiveEmpty 
+            : consecutiveEmptyFields;
+      } else {
+        consecutiveEmptyFields = 0;
+      }
+    }
+    
+    // Rechazar filas con más de 1 campo vacío consecutivo (es decir, 2 comas seguidas ,,)
+    if (maxConsecutiveEmpty > 1) return false;
+    
+    // Verificar que tenga al menos algunos datos de sensores (no GPS porque puede faltar)
     final hasAccelerometer = originalRow['acc_x'] != null || 
                             originalRow['acc_y'] != null || 
                             originalRow['acc_z'] != null;
@@ -1227,24 +1317,19 @@ class _SensorHomePageState extends State<SensorHomePage> {
                         originalRow['gyro_y'] != null || 
                         originalRow['gyro_z'] != null;
     
-    final hasGPS = originalRow['gps_lat'] != null || 
-                  originalRow['gps_lng'] != null;
-    
-    // La fila es válida si tiene timestamp y al menos un tipo de dato
-    return hasAccelerometer || hasGyroscope || hasGPS;
+    // La fila es válida si tiene timestamp y al menos datos de sensores
+    return hasAccelerometer || hasGyroscope;
   }
 
-  /// Limpiar filas incompletas al final del archivo
+  /// Limpiar filas incompletas al final del archivo con verificación estricta
   List<String> _cleanIncompleteRows(List<String> rows) {
     if (rows.isEmpty) return rows;
     
     // Contar el número esperado de campos (13 campos en total)
     const expectedFieldCount = 13;
     
-    // Buscar desde el final hacia atrás hasta encontrar filas válidas consecutivas
-    int lastValidIndex = rows.length - 1;
-    int consecutiveValidRows = 0;
-    const minConsecutiveValid = 3; // Requerir al menos 3 filas válidas consecutivas
+    // Buscar desde el final hacia atrás la última fila completamente válida
+    int lastValidIndex = -1;
     
     for (int i = rows.length - 1; i >= 0; i--) {
       final fields = rows[i].split(',');
@@ -1254,30 +1339,64 @@ class _SensorHomePageState extends State<SensorHomePage> {
         // Verificar que tenga timestamp válido
         final timestamp = fields[0];
         if (timestamp.isNotEmpty && int.tryParse(timestamp) != null) {
-          consecutiveValidRows++;
+          // Verificar que al menos tengamos algunos datos de sensores
+          // No exigir GPS porque puede no estar disponible, pero sí sensores
+          bool hasSensorData = false;
           
-          // Si hemos encontrado suficientes filas válidas consecutivas, parar aquí
-          if (consecutiveValidRows >= minConsecutiveValid) {
-            break;
+          // Verificar acelerómetro (campos 1, 2, 3)
+          for (int j = 1; j <= 3; j++) {
+            if (fields[j].isNotEmpty && fields[j] != 'null' && fields[j] != '') {
+              hasSensorData = true;
+              break;
+            }
           }
-        } else {
-          // Fila inválida, reiniciar contador
-          consecutiveValidRows = 0;
-          lastValidIndex = i - 1;
+          
+          // Verificar giroscopio (campos 4, 5, 6) si no hay acelerómetro
+          if (!hasSensorData) {
+            for (int j = 4; j <= 6; j++) {
+              if (fields[j].isNotEmpty && fields[j] != 'null' && fields[j] != '') {
+                hasSensorData = true;
+                break;
+              }
+            }
+          }
+          
+          // Verificar que no haya campos vacíos consecutivos (como ,,)
+          // Contar campos vacíos consecutivos
+          int consecutiveEmptyFields = 0;
+          int maxConsecutiveEmpty = 0;
+          
+          for (int j = 0; j < fields.length; j++) {
+            if (fields[j].isEmpty || fields[j] == 'null') {
+              consecutiveEmptyFields++;
+              maxConsecutiveEmpty = maxConsecutiveEmpty > consecutiveEmptyFields 
+                  ? maxConsecutiveEmpty 
+                  : consecutiveEmptyFields;
+            } else {
+              consecutiveEmptyFields = 0;
+            }
+          }
+          
+          // La fila es válida si tiene timestamp, datos de sensores, y NO tiene campos vacíos consecutivos
+          if (hasSensorData && maxConsecutiveEmpty <= 1) {
+            lastValidIndex = i;
+            break; // Encontramos la última fila válida
+          }
         }
-      } else {
-        // Fila incompleta, reiniciar contador
-        consecutiveValidRows = 0;
-        lastValidIndex = i - 1;
       }
     }
     
-    // Si no encontramos suficientes filas válidas consecutivas al final,
-    // usar la última fila que sabemos que es válida
-    if (consecutiveValidRows < minConsecutiveValid && lastValidIndex >= 0) {
+    // Si encontramos una fila válida y hay filas a remover
+    if (lastValidIndex >= 0 && lastValidIndex < rows.length - 1) {
       final cleanedRows = rows.sublist(0, lastValidIndex + 1);
-      print('🔧 Limpieza CSV: Removidas ${rows.length - cleanedRows.length} filas incompletas del final');
+      // Removidos los print statements para no mostrar mensajes al usuario
       return cleanedRows;
+    }
+    
+    // Si no hay filas a remover o no encontramos filas válidas
+    if (lastValidIndex == -1) {
+      // Removido el print statement
+      return []; // Retornar lista vacía si no hay filas válidas
     }
     
     return rows;
