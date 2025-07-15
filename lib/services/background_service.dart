@@ -243,7 +243,7 @@ void onStart(ServiceInstance service) async {
     // Actualizar notificación
     if (service is AndroidServiceInstance) {
       service.setForegroundNotificationInfo(
-        title: "Sensor Data Collector Pro",
+        title: "RecWay",
         content: "Listo para recolectar datos",
       );
     }

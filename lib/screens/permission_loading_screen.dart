@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class PermissionLoadingScreen extends StatefulWidget {
   final String currentStep;
@@ -51,22 +52,14 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
     return PopScope(
       canPop: false, // Evitar que el usuario salga accidentalmente
       child: Scaffold(
-        backgroundColor: const Color(0xFF1A1A2E),
+        backgroundColor: AppColors.primaryDark,
         body: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1A1A2E),
-                Color(0xFF16213E),
-                Color(0xFF0F3460),
-              ],
-            ),
+            gradient: AppColors.primaryGradient,
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(32.0),
+              padding: const EdgeInsets.all(AppDimensions.paddingXL),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -78,15 +71,10 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                       height: 120,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF4FACFE),
-                            Color(0xFF00F2FE),
-                          ],
-                        ),
+                        gradient: AppColors.accentGradient,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF4FACFE).withOpacity(0.3),
+                            color: AppColors.accentBlue.withOpacity(0.3),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),
@@ -95,99 +83,93 @@ class _PermissionLoadingScreenState extends State<PermissionLoadingScreen>
                       child: const Icon(
                         Icons.sensors,
                         size: 60,
-                        color: Colors.white,
+                        color: AppColors.surface,
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: AppDimensions.paddingXL + 8),
 
                   // Título
-                  const Text(
+                  Text(
                     'RecWay',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    style: AppTextStyles.headline1.copyWith(
+                      color: AppColors.surface,
                       letterSpacing: 1.2,
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppDimensions.paddingM),
 
                   // Subtítulo
                   Text(
                     'Configurando aplicación...',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white.withOpacity(0.8),
+                    style: AppTextStyles.subtitle1.copyWith(
+                      color: AppColors.surface.withOpacity(0.8),
                       fontWeight: FontWeight.w300,
                     ),
                   ),
 
-                  const SizedBox(height: 60),
+                  const SizedBox(height: AppDimensions.paddingXL + AppDimensions.paddingL),
 
                   // Barra de progreso
                   Container(
                     width: double.infinity,
                     height: 8,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusS / 2),
+                      color: AppColors.surface.withOpacity(0.1),
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusS / 2),
                       child: LinearProgressIndicator(
                         value: widget.progress,
                         backgroundColor: Colors.transparent,
                         valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF4FACFE),
+                          AppColors.accentBlue,
                         ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppDimensions.paddingL - 4),
 
                   // Porcentaje
                   Text(
                     '${(widget.progress * 100).toInt()}%',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4FACFE),
+                    style: AppTextStyles.headline3.copyWith(
+                      color: AppColors.accentBlue,
                     ),
                   ),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: AppDimensions.paddingXL + 8),
 
                   // Paso actual
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
+                      horizontal: AppDimensions.paddingL,
+                      vertical: AppDimensions.paddingM,
                     ),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusM),
+                      color: AppColors.surface.withOpacity(0.05),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.1),
+                        color: AppColors.surface.withOpacity(0.1),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.settings,
-                          color: Color(0xFF4FACFE),
-                          size: 24,
+                          color: AppColors.accentBlue,
+                          size: AppDimensions.iconM,
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: AppDimensions.paddingM),
                         Expanded(
                           child: Text(
                             widget.currentStep,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.white,
+                            style: AppTextStyles.body1.copyWith(
+                              color: AppColors.surface,
                               fontWeight: FontWeight.w400,
                             ),
                           ),

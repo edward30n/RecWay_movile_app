@@ -13,6 +13,7 @@ import '../services/permission_service.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
+import '../theme/app_theme.dart';
 
 class SensorHomePage extends StatefulWidget {
   final bool skipInitialization;
@@ -360,6 +361,60 @@ class _SensorHomePageState extends State<SensorHomePage> {
     );
   }
 
+  /// Inicializar GPS de forma más robusta
+  Future<void> _initializeGPS() async {
+    try {
+      // Verificar servicios de ubicación
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print('⚠️ Servicios de ubicación deshabilitados');
+        return;
+      }
+
+      // Verificar permisos
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        print('⚠️ Permisos de ubicación denegados');
+        return;
+      }
+
+      // Intentar obtener posición actual con timeout corto
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+        setState(() {
+          _currentPosition = position;
+        });
+        print('📍 Posición inicial obtenida: ${position.latitude}, ${position.longitude}');
+      } catch (e) {
+        print('⚠️ No se pudo obtener posición inicial: $e');
+        // Usar última posición conocida
+        await _tryLastKnownPosition();
+      }
+    } catch (e) {
+      print('⚠️ Error inicializando GPS: $e');
+    }
+  }
+
+  /// Intentar obtener la última posición conocida como fallback
+  Future<void> _tryLastKnownPosition() async {
+    try {
+      final lastPosition = await Geolocator.getLastKnownPosition();
+      if (lastPosition != null) {
+        setState(() {
+          _currentPosition = lastPosition;
+        });
+        print('📍 Usando última posición conocida: ${lastPosition.latitude}, ${lastPosition.longitude}');
+      }
+    } catch (e) {
+      print('⚠️ No se pudo obtener última posición conocida: $e');
+    }
+  }
+
   void _startRecording() async {
     if (_isRecording) return;
 
@@ -373,6 +428,9 @@ class _SensorHomePageState extends State<SensorHomePage> {
 
     // Activar wakelock
     await WakelockPlus.enable();
+
+    // Inicializar GPS de forma robusta
+    await _initializeGPS();
 
     // Iniciar timer para el tiempo de grabación
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
@@ -389,14 +447,14 @@ class _SensorHomePageState extends State<SensorHomePage> {
       }
     });
 
-    // Configurar GPS con máxima precisión
+    // Configurar GPS con configuración más permisiva para evitar timeouts
     const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
-      timeLimit: Duration(seconds: 30),
+      accuracy: LocationAccuracy.high, // Cambiado de bestForNavigation
+      distanceFilter: 1, // Cambiado de 0 para reducir carga
+      timeLimit: Duration(minutes: 2), // Aumentado para evitar timeouts
     );
 
-    // Iniciar stream de GPS (solo para actualizar la UI, no para guardar datos)
+    // Iniciar stream de GPS con manejo de errores mejorado
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen(
@@ -406,9 +464,19 @@ class _SensorHomePageState extends State<SensorHomePage> {
         });
       },
       onError: (error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error GPS: $error')),
-        );
+        print('⚠️ Error GPS: $error');
+        // No mostrar error en UI para timeouts, solo para errores graves
+        if (!error.toString().contains('timeout') && !error.toString().contains('time limit')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('GPS temporalmente no disponible'),
+              backgroundColor: AppColors.warning,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        // Intentar obtener la última posición conocida
+        _tryLastKnownPosition();
       },
     );
 
@@ -510,27 +578,47 @@ class _SensorHomePageState extends State<SensorHomePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Grabación Completada'),
+        backgroundColor: AppColors.primaryMedium,
+        title: Text(
+          'Grabación Completada',
+          style: AppTextStyles.headline3.copyWith(color: AppColors.surface),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Duración: ${_formatTime(_recordingTime)}'),
-            Text('Muestras recolectadas: $_dataCount'),
+            Text(
+              'Duración: ${_formatTime(_recordingTime)}',
+              style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+            ),
+            Text(
+              'Muestras recolectadas: $_dataCount',
+              style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+            ),
             if (_recordingTime > 0)
-              Text('Frecuencia promedio: ${(_dataCount / _recordingTime).toStringAsFixed(1)} Hz'),
+              Text(
+                'Frecuencia promedio: ${(_dataCount / _recordingTime).toStringAsFixed(1)} Hz',
+                style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+              ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
+            child: Text(
+              'OK',
+              style: TextStyle(color: AppColors.surface),
+            ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               _exportData();
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentBlue,
+              foregroundColor: AppColors.surface,
+            ),
             child: Text('Exportar'),
           ),
         ],
@@ -541,10 +629,11 @@ class _SensorHomePageState extends State<SensorHomePage> {
   Future<void> _exportData() async {
     if (_currentSessionId == null) return;
 
-    // Verificar permisos de almacenamiento
-    final hasStoragePermission = await PermissionService.hasStoragePermission();
+    // Verificar permisos de almacenamiento con la nueva función mejorada
+    final hasStoragePermission = await PermissionService.requestStoragePermissionsForExport();
     if (!hasStoragePermission) {
-      _showStoragePermissionDialog();
+      // Mostrar diálogo explicativo específico
+      PermissionService.showStoragePermissionExplanation(context);
       return;
     }
 
@@ -554,20 +643,28 @@ class _SensorHomePageState extends State<SensorHomePage> {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
+          backgroundColor: AppColors.primaryMedium,
           content: Row(
             children: [
-              CircularProgressIndicator(),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentBlue),
+              ),
               SizedBox(width: 16),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Exportando datos...'),
+                    Text(
+                      'Exportando datos...',
+                      style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                    ),
                     SizedBox(height: 4),
                     Text(
                       'Generando archivo CSV',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.surface.withOpacity(0.7),
+                      ),
                     ),
                   ],
                 ),
@@ -602,28 +699,59 @@ class _SensorHomePageState extends State<SensorHomePage> {
       csvContent += '# Fecha de exportación: ${DateTime.now().toIso8601String()}\n';
       csvContent += '# Total de registros: ${data.length}\n';
       csvContent += '# Frecuencia de muestreo: $_samplingRate Hz\n';
+      csvContent += '# Formato de datos:\n';
+      csvContent += '#   - Sensores (acc/gyro): 6 decimales de precisión\n';
+      csvContent += '#   - GPS (lat/lng): 8 decimales de precisión\n';
+      csvContent += '#   - Filas incompletas automáticamente removidas\n';
       csvContent += '#\n';
       csvContent += 'timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,gps_lat,gps_lng,gps_accuracy,gps_speed,gps_altitude,gps_heading\n';
       
       // Procesar datos en lotes más pequeños para evitar problemas de memoria
       const batchSize = 50; // Reducido de 100 a 50 para mayor estabilidad
-      final buffer = StringBuffer();
+      final validRows = <String>[];
       
       for (int i = 0; i < data.length; i += batchSize) {
         final endIndex = (i + batchSize < data.length) ? i + batchSize : data.length;
         final batch = data.sublist(i, endIndex);
         
-        // Procesar el lote actual
+        // Procesar el lote actual con validación y formato de precisión
         for (var row in batch) {
-          buffer.writeln('${row['timestamp']},${row['acc_x'] ?? ''},${row['acc_y'] ?? ''},${row['acc_z'] ?? ''},${row['gyro_x'] ?? ''},${row['gyro_y'] ?? ''},${row['gyro_z'] ?? ''},${row['gps_lat'] ?? ''},${row['gps_lng'] ?? ''},${row['gps_accuracy'] ?? ''},${row['gps_speed'] ?? ''},${row['gps_altitude'] ?? ''},${row['gps_heading'] ?? ''}');
+          // Formatear valores con precisión específica
+          final accX = _formatSensorValue(row['acc_x']);
+          final accY = _formatSensorValue(row['acc_y']);
+          final accZ = _formatSensorValue(row['acc_z']);
+          final gyroX = _formatSensorValue(row['gyro_x']);
+          final gyroY = _formatSensorValue(row['gyro_y']);
+          final gyroZ = _formatSensorValue(row['gyro_z']);
+          
+          // Formatear valores GPS (mayor precisión para coordenadas)
+          final gpsLat = _formatGPSValue(row['gps_lat']);
+          final gpsLng = _formatGPSValue(row['gps_lng']);
+          final gpsAccuracy = _formatGPSValue(row['gps_accuracy']);
+          final gpsSpeed = _formatGPSValue(row['gps_speed']);
+          final gpsAltitude = _formatGPSValue(row['gps_altitude']);
+          final gpsHeading = _formatGPSValue(row['gps_heading']);
+          
+          // Crear la fila CSV
+          final csvRow = '${row['timestamp']},$accX,$accY,$accZ,$gyroX,$gyroY,$gyroZ,$gpsLat,$gpsLng,$gpsAccuracy,$gpsSpeed,$gpsAltitude,$gpsHeading';
+          
+          // Validar que la fila tenga contenido esencial (timestamp y al menos un sensor)
+          if (_isValidCSVRow(csvRow, row)) {
+            validRows.add(csvRow);
+          }
         }
         
-        // Agregar al contenido principal y limpiar buffer
-        csvContent += buffer.toString();
-        buffer.clear();
-        
-        // Dar más tiempo al sistema para procesar y liberar memoria
+        // Dar más tiempo al sistema para procesar
         await Future.delayed(Duration(milliseconds: 20));
+      }
+      
+      // Verificar y limpiar filas incompletas al final
+      final cleanedRows = _cleanIncompleteRows(validRows);
+      
+      // Agregar filas validadas al contenido CSV
+      csvContent += cleanedRows.join('\n');
+      if (cleanedRows.isNotEmpty) {
+        csvContent += '\n'; // Asegurar nueva línea al final
       }
 
       // Intentar guardar en múltiples ubicaciones
@@ -665,8 +793,23 @@ class _SensorHomePageState extends State<SensorHomePage> {
       }
 
       if (savedFiles.isNotEmpty) {
+        // Mostrar información sobre la limpieza de datos
+        final originalCount = data.length;
+        final finalCount = cleanedRows.length;
+        
+        if (originalCount != finalCount) {
+          print('📊 Limpieza de datos: $originalCount registros originales → $finalCount registros finales');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Datos procesados: ${originalCount - finalCount} registros incompletos removidos'),
+              backgroundColor: AppColors.accentBlue,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        
         // Mostrar opciones de exportación
-        _showExportOptionsDialog(savedFiles, data.length, fileName);
+        _showExportOptionsDialog(savedFiles, finalCount, fileName);
       } else {
         throw Exception('No se pudo guardar el archivo en ninguna ubicación');
       }
@@ -695,11 +838,15 @@ class _SensorHomePageState extends State<SensorHomePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: AppColors.primaryMedium,
         title: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 24),
+            Icon(Icons.check_circle, color: AppColors.success, size: 24),
             SizedBox(width: 8),
-            Text('¡Datos Exportados!'),
+            Text(
+              'Completado',
+              style: AppTextStyles.headline3.copyWith(color: AppColors.surface),
+            ),
           ],
         ),
         content: Column(
@@ -707,46 +854,67 @@ class _SensorHomePageState extends State<SensorHomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppDimensions.paddingM),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                border: Border.all(color: AppColors.success.withOpacity(0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('📊 Registros exportados: $recordCount'),
-                  Text('📁 Archivo: $fileName'),
-                  Text('💾 Ubicaciones: ${files.length}'),
+                  Text(
+                    'Registros: $recordCount',
+                    style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                  ),
+                  Text(
+                    'Archivo: $fileName',
+                    style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                  ),
+                  Text(
+                    'Ubicaciones: ${files.length}',
+                    style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                  ),
                 ],
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: AppDimensions.paddingM),
             Text(
               'El archivo se guardó en:',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: AppTextStyles.subtitle1.copyWith(
+                color: AppColors.surface,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: AppDimensions.paddingS),
             ...files.map((file) => Padding(
               padding: EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
-                  Icon(Icons.folder, size: 16, color: Colors.grey[600]),
+                  Icon(
+                    Icons.folder, 
+                    size: 16, 
+                    color: AppColors.accentBlue,
+                  ),
                   SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       _getReadableePath(file.path),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.surface.withOpacity(0.8),
+                      ),
                     ),
                   ),
                 ],
               ),
             )),
-            SizedBox(height: 16),
+            SizedBox(height: AppDimensions.paddingM),
             Text(
               '¿Qué quieres hacer ahora?',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue[700]),
+              style: AppTextStyles.subtitle1.copyWith(
+                color: AppColors.accentBlue,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -756,19 +924,29 @@ class _SensorHomePageState extends State<SensorHomePage> {
               Navigator.pop(context);
               _shareFile(files.first);
             },
-            icon: Icon(Icons.share, color: Colors.blue),
-            label: Text('Compartir'),
+            icon: Icon(Icons.share, color: AppColors.accentBlue),
+            label: Text(
+              'Compartir',
+              style: TextStyle(color: AppColors.accentBlue),
+            ),
           ),
           TextButton.icon(
             onPressed: () {
               Navigator.pop(context);
               _showFileDetailsDialog(files, recordCount);
             },
-            icon: Icon(Icons.info, color: Colors.orange),
-            label: Text('Detalles'),
+            icon: Icon(Icons.info, color: AppColors.warning),
+            label: Text(
+              'Detalles',
+              style: TextStyle(color: AppColors.warning),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentBlue,
+              foregroundColor: AppColors.surface,
+            ),
             child: Text('Cerrar'),
           ),
         ],
@@ -790,7 +968,11 @@ class _SensorHomePageState extends State<SensorHomePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('📋 Detalles del Archivo'),
+        backgroundColor: AppColors.primaryMedium,
+        title: Text(
+          '📋 Detalles del Archivo',
+          style: AppTextStyles.headline3.copyWith(color: AppColors.surface),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -800,31 +982,40 @@ class _SensorHomePageState extends State<SensorHomePage> {
               _buildDetailItem('📅 Fecha', DateTime.now().toString().split(' ')[0]),
               _buildDetailItem('⏰ Hora', DateTime.now().toString().split(' ')[1].split('.')[0]),
               _buildDetailItem('💾 Archivos guardados', files.length.toString()),
-              SizedBox(height: 16),
+              SizedBox(height: AppDimensions.paddingM),
               Text(
                 'Ubicaciones de archivos:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: AppTextStyles.subtitle1.copyWith(
+                  color: AppColors.surface,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              SizedBox(height: 8),
+              SizedBox(height: AppDimensions.paddingS),
               ...files.map((file) => Container(
                 margin: EdgeInsets.symmetric(vertical: 4),
-                padding: EdgeInsets.all(8),
+                padding: EdgeInsets.all(AppDimensions.paddingS),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(4),
+                  color: AppColors.primaryDark.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusS),
+                  border: Border.all(
+                    color: AppColors.surface.withOpacity(0.1),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _getReadableePath(file.path),
-                      style: TextStyle(fontWeight: FontWeight.w500),
+                      style: AppTextStyles.body1.copyWith(
+                        color: AppColors.surface,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
                       file.path,
-                      style: TextStyle(
+                      style: AppTextStyles.body2.copyWith(
                         fontSize: 10,
-                        color: Colors.grey[600],
+                        color: AppColors.surface.withOpacity(0.6),
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -840,12 +1031,18 @@ class _SensorHomePageState extends State<SensorHomePage> {
               Navigator.pop(context);
               _shareFile(files.first);
             },
-            icon: Icon(Icons.share),
-            label: Text('Compartir'),
+            icon: Icon(Icons.share, color: AppColors.accentBlue),
+            label: Text(
+              'Compartir',
+              style: TextStyle(color: AppColors.accentBlue),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cerrar'),
+            child: Text(
+              'Cerrar',
+              style: TextStyle(color: AppColors.surface),
+            ),
           ),
         ],
       ),
@@ -861,10 +1058,18 @@ class _SensorHomePageState extends State<SensorHomePage> {
             width: 120,
             child: Text(
               label,
-              style: TextStyle(fontWeight: FontWeight.w500),
+              style: AppTextStyles.body1.copyWith(
+                color: AppColors.surface,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
-          Text(value),
+          Text(
+            value,
+            style: AppTextStyles.body1.copyWith(
+              color: AppColors.surface.withOpacity(0.8),
+            ),
+          ),
         ],
       ),
     );
@@ -990,57 +1195,153 @@ class _SensorHomePageState extends State<SensorHomePage> {
     );
   }
 
+  /// Formatear valores de sensores (acelerómetro y giroscopio) con 6 decimales
+  String _formatSensorValue(dynamic value) {
+    if (value == null) return '';
+    if (value is num) {
+      return value.toStringAsFixed(6);
+    }
+    return value.toString();
+  }
+
+  /// Formatear valores GPS con mayor precisión (8 decimales para coordenadas)
+  String _formatGPSValue(dynamic value) {
+    if (value == null) return '';
+    if (value is num) {
+      return value.toStringAsFixed(8);
+    }
+    return value.toString();
+  }
+
+  /// Validar que una fila CSV tenga contenido esencial
+  bool _isValidCSVRow(String csvRow, Map<String, dynamic> originalRow) {
+    // Verificar que tenga timestamp
+    if (originalRow['timestamp'] == null) return false;
+    
+    // Verificar que tenga al menos algunos datos de sensores
+    final hasAccelerometer = originalRow['acc_x'] != null || 
+                            originalRow['acc_y'] != null || 
+                            originalRow['acc_z'] != null;
+    
+    final hasGyroscope = originalRow['gyro_x'] != null || 
+                        originalRow['gyro_y'] != null || 
+                        originalRow['gyro_z'] != null;
+    
+    final hasGPS = originalRow['gps_lat'] != null || 
+                  originalRow['gps_lng'] != null;
+    
+    // La fila es válida si tiene timestamp y al menos un tipo de dato
+    return hasAccelerometer || hasGyroscope || hasGPS;
+  }
+
+  /// Limpiar filas incompletas al final del archivo
+  List<String> _cleanIncompleteRows(List<String> rows) {
+    if (rows.isEmpty) return rows;
+    
+    // Contar el número esperado de campos (13 campos en total)
+    const expectedFieldCount = 13;
+    
+    // Buscar desde el final hacia atrás hasta encontrar filas válidas consecutivas
+    int lastValidIndex = rows.length - 1;
+    int consecutiveValidRows = 0;
+    const minConsecutiveValid = 3; // Requerir al menos 3 filas válidas consecutivas
+    
+    for (int i = rows.length - 1; i >= 0; i--) {
+      final fields = rows[i].split(',');
+      
+      // Verificar que la fila tenga el número correcto de campos
+      if (fields.length == expectedFieldCount) {
+        // Verificar que tenga timestamp válido
+        final timestamp = fields[0];
+        if (timestamp.isNotEmpty && int.tryParse(timestamp) != null) {
+          consecutiveValidRows++;
+          
+          // Si hemos encontrado suficientes filas válidas consecutivas, parar aquí
+          if (consecutiveValidRows >= minConsecutiveValid) {
+            break;
+          }
+        } else {
+          // Fila inválida, reiniciar contador
+          consecutiveValidRows = 0;
+          lastValidIndex = i - 1;
+        }
+      } else {
+        // Fila incompleta, reiniciar contador
+        consecutiveValidRows = 0;
+        lastValidIndex = i - 1;
+      }
+    }
+    
+    // Si no encontramos suficientes filas válidas consecutivas al final,
+    // usar la última fila que sabemos que es válida
+    if (consecutiveValidRows < minConsecutiveValid && lastValidIndex >= 0) {
+      final cleanedRows = rows.sublist(0, lastValidIndex + 1);
+      print('🔧 Limpieza CSV: Removidas ${rows.length - cleanedRows.length} filas incompletas del final');
+      return cleanedRows;
+    }
+    
+    return rows;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Sensor Data Collector Pro'),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Status Cards
-            StatusCards(
-              recordingTime: _recordingTime,
-              dataCount: _dataCount,
-              samplingRate: _samplingRate,
-              isRecording: _isRecording,
-            ),
-            
-            SizedBox(height: 24),
+    return AppWidgets.gradientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(
+            'RecWay',
+            style: AppTextStyles.headline3.copyWith(color: AppColors.surface),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: SingleChildScrollView(
+          padding: EdgeInsets.all(AppDimensions.paddingM),
+          child: Column(
+            children: [
+              // Status Cards
+              StatusCards(
+                recordingTime: _recordingTime,
+                dataCount: _dataCount,
+                samplingRate: _samplingRate,
+                isRecording: _isRecording,
+              ),
+              
+              SizedBox(height: AppDimensions.paddingL),
 
-            // Control Panel
-            ControlPanel(
-              isRecording: _isRecording,
-              samplingRate: _samplingRate,
-              backgroundMode: _backgroundMode,
-              dataCount: _dataCount,
-              onStartRecording: _startRecording,
-              onStopRecording: _stopRecording,
-              onExportData: _exportData,
-              onSamplingRateChanged: (rate) {
-                setState(() {
-                  _samplingRate = rate;
-                });
-              },
-              onBackgroundModeChanged: (enabled) {
-                setState(() {
-                  _backgroundMode = enabled;
-                });
-              },
-            ),
+              // Control Panel
+              ControlPanel(
+                isRecording: _isRecording,
+                samplingRate: _samplingRate,
+                backgroundMode: _backgroundMode,
+                dataCount: _dataCount,
+                onStartRecording: _startRecording,
+                onStopRecording: _stopRecording,
+                onExportData: _exportData,
+                onSamplingRateChanged: (rate) {
+                  setState(() {
+                    _samplingRate = rate;
+                  });
+                },
+                onBackgroundModeChanged: (enabled) {
+                  setState(() {
+                    _backgroundMode = enabled;
+                  });
+                },
+              ),
 
-            SizedBox(height: 24),
+              SizedBox(height: AppDimensions.paddingL),
 
-            // Sensor Data Display
-            SensorCard(
-              accelerometer: _currentAccelerometer,
-              gyroscope: _currentGyroscope,
-              position: _currentPosition,
-            ),
-          ],
+              // Sensor Data Display
+              SensorCard(
+                accelerometer: _currentAccelerometer,
+                gyroscope: _currentGyroscope,
+                position: _currentPosition,
+              ),
+            ],
+          ),
         ),
       ),
     );

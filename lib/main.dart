@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'screens/simple_splash_screen.dart';
 import 'services/background_service.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   // Configurar manejo de errores globales
@@ -56,42 +57,50 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'RecWay Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.blue.shade700,
-          foregroundColor: Colors.white,
-          elevation: 2,
-        ),
+      title: 'RecWay Pro',
+      theme: AppTheme.darkTheme,
+      home: AppWidgets.gradientBackground(
+        child: SimpleSplashScreen(),
       ),
-      home: SimpleSplashScreen(),
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        // Error boundary a nivel de app - versión simplificada
+        // Error boundary a nivel de app - versión simplificada con tema
         ErrorWidget.builder = (FlutterErrorDetails details) {
           return Scaffold(
-            backgroundColor: Colors.red.shade50,
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    SizedBox(height: 16),
-                    Text(
-                      'Error en la aplicación',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            backgroundColor: AppColors.primaryDark,
+            body: Container(
+              decoration: const BoxDecoration(
+                gradient: AppColors.primaryGradient,
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.paddingL),
+                  child: AppWidgets.gradientCard(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.error_outline, 
+                          size: AppDimensions.iconXL + 16, 
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(height: AppDimensions.paddingM),
+                        Text(
+                          'Error en la aplicación',
+                          style: AppTextStyles.headline2.copyWith(
+                            color: AppColors.error,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppDimensions.paddingS),
+                        Text(
+                          'Por favor, reinicia la aplicación',
+                          style: AppTextStyles.body1,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Por favor, reinicia la aplicación',
-                      style: TextStyle(fontSize: 16),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
