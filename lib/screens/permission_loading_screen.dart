@@ -6,11 +6,11 @@ class PermissionLoadingScreen extends StatefulWidget {
   final VoidCallback? onCancel;
 
   const PermissionLoadingScreen({
-    Key? key,
+    super.key,
     required this.currentStep,
     required this.progress,
     this.onCancel,
-  }) : super(key: key);
+  });
 
   @override
   State<PermissionLoadingScreen> createState() => _PermissionLoadingScreenState();

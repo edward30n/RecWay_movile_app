@@ -16,7 +16,7 @@ class NativeSensorService {
       });
       
       _isListening = true;
-      print('🔋 Sensores nativos iniciados a ${samplingRate} Hz');
+      print('🔋 Sensores nativos iniciados a $samplingRate Hz');
       return true;
     } catch (e) {
       print('❌ Error iniciando sensores nativos: $e');

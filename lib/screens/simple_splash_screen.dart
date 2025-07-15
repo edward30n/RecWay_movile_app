@@ -4,11 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'permission_loading_screen.dart';
 import 'sensor_home_page.dart';
-import '../services/permission_service.dart';
 import '../services/database_service.dart';
 
 class SimpleSplashScreen extends StatefulWidget {
-  const SimpleSplashScreen({Key? key}) : super(key: key);
+  const SimpleSplashScreen({super.key});
 
   @override
   State<SimpleSplashScreen> createState() => _SimpleSplashScreenState();

@@ -10,12 +10,9 @@ import 'dart:async';
 import 'dart:io';
 import '../services/database_service.dart';
 import '../services/permission_service.dart';
-import '../services/native_sensor_service.dart';
-import '../services/sensor_diagnostic_service.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
-import 'emergency_error_screen.dart';
 
 class SensorHomePage extends StatefulWidget {
   final bool skipInitialization;
@@ -63,60 +60,33 @@ class _SensorHomePageState extends State<SensorHomePage> {
   }
 
   Future<void> _initializeApp() async {
-    print('🚀 === INICIANDO APLICACIÓN ===');
-    
-    // Verificar estado inicial de permisos
-    await PermissionService.checkAndLogAllPermissions();
-    
     // Verificar si es la primera vez que se abre la app
     final isFirstLaunch = await _isFirstLaunch();
     
     if (isFirstLaunch) {
-      print('🆕 Primera vez abriendo la app');
-      // Mostrar diálogo de bienvenida y explicación de permisos
       await _showWelcomeAndPermissionsDialog();
     }
     
-    print('🔐 Iniciando solicitud de permisos paso a paso...');
-    
-    // Primero intentar los permisos de ubicación paso a paso
+    // Solicitar permisos de ubicación
     bool locationSuccess = await PermissionService.requestLocationPermissionsStepByStep();
     
     if (locationSuccess) {
-      print('✅ Permisos de ubicación obtenidos, continuando con otros permisos...');
-      
-      // Ahora solicitar el resto de permisos
-      final allPermissionsGranted = await PermissionService.requestAllPermissions();
-      print('📋 Resultado todos los permisos: $allPermissionsGranted');
-      
-      if (!allPermissionsGranted) {
-        print('⚠️ Algunos permisos adicionales no fueron concedidos');
-      }
+      await PermissionService.requestAllPermissions();
     } else {
-      print('❌ No se pudieron obtener permisos de ubicación - funcionalidad limitada');
       _showLocationPermissionRequiredDialog();
     }
 
-    print('🛰️ Verificando servicios de ubicación...');
+    // Verificar servicios de ubicación
     final locationServicesEnabled = await PermissionService.checkLocationServices();
     if (!locationServicesEnabled) {
-      print('❌ Servicios de ubicación deshabilitados');
       _showLocationServiceDialog();
-    } else {
-      print('✅ Servicios de ubicación habilitados');
     }
 
-    // Verificar permisos específicos después de la solicitud
+    // Verificar permisos específicos
     await _checkAndRequestSpecificPermissions();
     
-    // Solicitar deshabilitar optimización de batería y configurar sensores nativos
+    // Solicitar deshabilitar optimización de batería
     await _requestBatteryOptimizationPermission();
-    await _initializeNativeSensors();
-    
-    // Log final del estado
-    await PermissionService.checkAndLogAllPermissions();
-    
-    print('✅ === INICIALIZACIÓN COMPLETA ===');
   }
 
   Future<bool> _isFirstLaunch() async {
@@ -342,11 +312,9 @@ class _SensorHomePageState extends State<SensorHomePage> {
   }
 
   Future<void> _retryLocationPermissions() async {
-    print('🔄 Reintentando permisos de ubicación...');
     bool success = await PermissionService.requestLocationPermissionsStepByStep();
     
     if (success) {
-      print('✅ Permisos obtenidos en el reintento');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('✅ Permisos de ubicación concedidos'),
@@ -354,7 +322,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
         ),
       );
     } else {
-      print('❌ Permisos aún no concedidos');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ Permisos de ubicación requeridos para funcionalidad completa'),
@@ -404,9 +371,8 @@ class _SensorHomePageState extends State<SensorHomePage> {
       _dataCount = 0;
     });
 
-    // ACTIVAR WAKELOCK PARA MANTENER SENSORES ACTIVOS
+    // Activar wakelock
     await WakelockPlus.enable();
-    print('🔋 WakeLock activado en app principal');
 
     // Iniciar timer para el tiempo de grabación
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
@@ -438,38 +404,32 @@ class _SensorHomePageState extends State<SensorHomePage> {
         setState(() {
           _currentPosition = position;
         });
-        // No guardamos aquí, el timer se encarga de eso
       },
       onError: (error) {
-        print('Error GPS: $error');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error GPS: $error')),
         );
       },
     );
 
-    // Iniciar sensores con alta frecuencia (solo para actualizar la UI)
+    // Iniciar sensores con alta frecuencia
     _accelerometerSubscription = accelerometerEventStream(
-      samplingPeriod: SensorInterval.gameInterval, // 20ms para mejor respuesta
+      samplingPeriod: SensorInterval.gameInterval,
     ).listen(
       (AccelerometerEvent event) {
         setState(() {
           _currentAccelerometer = event;
         });
-        // Log para verificar que los datos cambian
-        print('📱 APP Accel: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
       },
     );
 
     _gyroscopeSubscription = gyroscopeEventStream(
-      samplingPeriod: SensorInterval.gameInterval, // 20ms para mejor respuesta
+      samplingPeriod: SensorInterval.gameInterval,
     ).listen(
       (GyroscopeEvent event) {
         setState(() {
           _currentGyroscope = event;
         });
-        // Log para verificar que los datos cambian
-        print('📱 APP Gyro: ${event.x.toStringAsFixed(3)}, ${event.y.toStringAsFixed(3)}, ${event.z.toStringAsFixed(3)}');
       },
     );
 
@@ -480,7 +440,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Grabación iniciada - ${_samplingRate} Hz (SENSORES ACTIVOS)'),
+        content: Text('Grabación iniciada - $_samplingRate Hz'),
         backgroundColor: Colors.green,
         duration: Duration(seconds: 3),
       ),
@@ -540,13 +500,10 @@ class _SensorHomePageState extends State<SensorHomePage> {
   Future<void> _startBackgroundService() async {
     final service = FlutterBackgroundService();
     
-    // Enviar comando al servicio para iniciar grabación
     service.invoke('startRecording', {
       'sessionId': _currentSessionId,
       'samplingRate': _samplingRate,
     });
-    
-    print('📤 Comando enviado al servicio: iniciar grabación');
   }
 
   void _showDataSummary() {
@@ -621,9 +578,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
       );
 
       // Procesar datos en lotes para evitar sobrecarga de memoria
-      print('🔄 Iniciando exportación para sesión: $_currentSessionId');
       final data = await DatabaseService.getData(sessionId: _currentSessionId);
-      print('📊 Total de registros a exportar: ${data.length}');
       
       if (data.isEmpty) {
         Navigator.pop(context); // Cerrar diálogo de carga
@@ -669,11 +624,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
         
         // Dar más tiempo al sistema para procesar y liberar memoria
         await Future.delayed(Duration(milliseconds: 20));
-        
-        // Actualizar progreso cada 10 lotes
-        if (i % (batchSize * 10) == 0) {
-          print('📈 Procesando: ${(i / data.length * 100).toInt()}% completado');
-        }
       }
 
       // Intentar guardar en múltiples ubicaciones
@@ -685,9 +635,8 @@ class _SensorHomePageState extends State<SensorHomePage> {
         final appFile = File('${appDir.path}/$fileName');
         await appFile.writeAsString(csvContent);
         savedFiles.add(appFile);
-        print('✅ Archivo guardado en app documents: ${appFile.path}');
       } catch (e) {
-        print('❌ Error guardando en app documents: $e');
+        // Error handling silently
       }
 
       try {
@@ -705,10 +654,9 @@ class _SensorHomePageState extends State<SensorHomePage> {
           final downloadsFile = File('${downloadsDir.path}/$fileName');
           await downloadsFile.writeAsString(csvContent);
           savedFiles.add(downloadsFile);
-          print('✅ Archivo guardado en Downloads: ${downloadsFile.path}');
         }
       } catch (e) {
-        print('❌ Error guardando en Downloads: $e');
+        // Error handling silently
       }
 
       // Cerrar diálogo de carga
@@ -724,8 +672,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
       }
 
     } catch (e) {
-      print('❌ Error durante la exportación: $e');
-      
       // Cerrar diálogo de carga si está abierto
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
@@ -796,7 +742,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
                   ),
                 ],
               ),
-            )).toList(),
+            )),
             SizedBox(height: 16),
             Text(
               '¿Qué quieres hacer ahora?',
@@ -884,7 +830,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
                     ),
                   ],
                 ),
-              )).toList(),
+              )),
             ],
           ),
         ),
@@ -960,7 +906,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
     final status = await Permission.ignoreBatteryOptimizations.request();
     
     if (status.isGranted) {
-      print('✅ Optimización de batería deshabilitada');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('✅ Optimización de batería deshabilitada - mejor rendimiento en segundo plano'),
@@ -968,31 +913,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
         ),
       );
     } else {
-      print('⚠️ Optimización de batería no deshabilitada');
       _showBatteryOptimizationDialog();
-    }
-    
-    // También solicitar optimización nativa
-    try {
-      await NativeSensorService.requestBatteryOptimization();
-      print('🔋 Solicitada optimización de batería nativa');
-    } catch (e) {
-      print('❌ Error solicitando optimización de batería nativa: $e');
-    }
-  }
-  
-  Future<void> _initializeNativeSensors() async {
-    try {
-      final status = await NativeSensorService.getStatus();
-      print('📱 Estado sensores nativos: $status');
-      
-      if (status['hasAccelerometer'] == true && status['hasGyroscope'] == true) {
-        print('✅ Sensores nativos disponibles');
-      } else {
-        print('⚠️ Algunos sensores nativos no están disponibles');
-      }
-    } catch (e) {
-      print('❌ Error inicializando sensores nativos: $e');
     }
   }
 
@@ -1069,230 +990,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
     );
   }
 
-  /// Diagnóstico avanzado de sensores
-  Future<void> _performSensorDiagnostic() async {
-    setState(() {
-      _isRecording = false;
-    });
-
-    // Detener cualquier grabación activa
-    _stopRecording();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.sensors, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('🔬 Diagnóstico de Sensores'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Analizando sensores...\n\n'
-              'Por favor, mueve ligeramente el dispositivo\n'
-              'durante los próximos 5 segundos.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      // Realizar diagnóstico completo
-      final sensorTest = await SensorDiagnosticService.testSensorValues();
-      final gyroZeroTest = await SensorDiagnosticService.diagnoseGyroscopeZeros();
-      
-      Navigator.pop(context); // Cerrar diálogo de progreso
-      
-      // Mostrar resultados
-      _showDiagnosticResults(sensorTest, gyroZeroTest);
-      
-    } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Error durante diagnóstico: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _showDiagnosticResults(Map<String, dynamic> sensorTest, Map<String, dynamic> gyroTest) {
-    final isWorking = sensorTest['isWorking'] as bool? ?? false;
-    final problems = sensorTest['problems'] as List<String>? ?? [];
-    final gyroStuckAtZero = gyroTest['isGyroscopeStuckAtZero'] as bool? ?? false;
-    final recommendations = gyroTest['recommendations'] as List<String>? ?? [];
-    
-    final accelData = sensorTest['accelerometer'] as Map<String, dynamic>? ?? {};
-    final gyroData = sensorTest['gyroscope'] as Map<String, dynamic>? ?? {};
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isWorking ? Icons.check_circle : Icons.error,
-              color: isWorking ? Colors.green : Colors.red,
-            ),
-            SizedBox(width: 8),
-            Text(isWorking ? '✅ Sensores OK' : '❌ Problemas Detectados'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '📊 Resultados del Análisis:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              SizedBox(height: 12),
-              
-              // Estado del acelerómetro
-              _buildSensorStatus(
-                '📱 Acelerómetro',
-                accelData['isResponsive'] as bool? ?? false,
-                accelData['samplesCount'] as int? ?? 0,
-                accelData['hasVariation'] as bool? ?? false,
-              ),
-              
-              SizedBox(height: 8),
-              
-              // Estado del giroscopio
-              _buildSensorStatus(
-                '🌀 Giroscopio',
-                gyroData['isResponsive'] as bool? ?? false,
-                gyroData['samplesCount'] as int? ?? 0,
-                gyroData['hasVariation'] as bool? ?? false,
-                extraInfo: gyroStuckAtZero ? 'VALORES EN CERO DETECTADOS' : null,
-              ),
-              
-              if (problems.isNotEmpty) ...[
-                SizedBox(height: 16),
-                Text(
-                  '⚠️ Problemas encontrados:',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-                ),
-                SizedBox(height: 8),
-                ...problems.map((problem) => Padding(
-                  padding: EdgeInsets.only(left: 16, bottom: 4),
-                  child: Text('• $problem', style: TextStyle(color: Colors.red.shade700)),
-                )),
-              ],
-              
-              if (recommendations.isNotEmpty) ...[
-                SizedBox(height: 16),
-                Text(
-                  '💡 Recomendaciones:',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
-                ),
-                SizedBox(height: 8),
-                ...recommendations.map((rec) => Padding(
-                  padding: EdgeInsets.only(left: 16, bottom: 4),
-                  child: Text('• $rec', style: TextStyle(color: Colors.blue.shade700)),
-                )),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          if (!isWorking)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showEmergencyScreen();
-              },
-              child: Text('Arreglar Problemas'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cerrar'),
-          ),
-          if (!isWorking)
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _performSensorDiagnostic(); // Repetir diagnóstico
-              },
-              child: Text('Probar de Nuevo'),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSensorStatus(String name, bool isResponsive, int samples, bool hasVariation, {String? extraInfo}) {
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isResponsive ? Colors.green.shade50 : Colors.red.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isResponsive ? Colors.green.shade200 : Colors.red.shade200,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isResponsive ? Icons.check_circle : Icons.error,
-                color: isResponsive ? Colors.green : Colors.red,
-                size: 20,
-              ),
-              SizedBox(width: 8),
-              Text(
-                name,
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          SizedBox(height: 4),
-          Text('Muestras: $samples'),
-          Text('Variación: ${hasVariation ? 'SÍ' : 'NO'}'),
-          if (extraInfo != null) ...[
-            SizedBox(height: 4),
-            Text(
-              extraInfo,
-              style: TextStyle(
-                color: Colors.red.shade700,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _showEmergencyScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EmergencyErrorScreen(
-          errorMessage: 'Problemas críticos con sensores detectados. Los sensores no están respondiendo correctamente.',
-          onRetry: () {
-            Navigator.pop(context);
-            _performSensorDiagnostic();
-          },
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1310,26 +1007,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
               dataCount: _dataCount,
               samplingRate: _samplingRate,
               isRecording: _isRecording,
-            ),
-            
-            SizedBox(height: 16),
-            
-            // Botón de Diagnóstico
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isRecording ? null : _performSensorDiagnostic,
-                icon: Icon(Icons.medical_services),
-                label: Text('🔬 Diagnóstico de Sensores'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
             ),
             
             SizedBox(height: 24),

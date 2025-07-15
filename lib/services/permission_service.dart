@@ -462,7 +462,7 @@ class PermissionService {
                            problemCount <= 2 ? 'minor' : 
                            problemCount <= 4 ? 'moderate' : 'severe';
       
-      print('📋 Diagnóstico completado: ${problemCount} problemas encontrados');
+      print('📋 Diagnóstico completado: $problemCount problemas encontrados');
       print('🎯 Severidad: ${results['severity']}');
       
       return results;

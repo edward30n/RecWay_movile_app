@@ -45,7 +45,7 @@ Future<void> initializeService() async {
     print('✅ Servicio configurado e iniciado correctamente');
   } catch (e) {
     print('❌ Error inicializando servicio: $e');
-    throw e;
+    rethrow;
   }
 }
 
@@ -114,7 +114,7 @@ void onStart(ServiceInstance service) async {
     samplingRate = data['samplingRate'] as int? ?? 10;
     isRecording = true;
     
-    print('🔴 Servicio: Iniciando grabación - ${samplingRate} Hz');
+    print('🔴 Servicio: Iniciando grabación - $samplingRate Hz');
     
     // MANTENER PANTALLA ACTIVA DURANTE GRABACIÓN
     await WakelockPlus.enable();
@@ -160,7 +160,7 @@ void onStart(ServiceInstance service) async {
     // Actualizar notificación
     if (service is AndroidServiceInstance) {
       service.setForegroundNotificationInfo(
-        title: "🔴 GRABANDO - ${samplingRate} Hz",
+        title: "🔴 GRABANDO - $samplingRate Hz",
         content: "Sesión: ${currentSessionId?.substring(8, 18) ?? 'N/A'} - Sensores ACTIVOS + NATIVOS",
       );
     }
@@ -257,7 +257,7 @@ void onStart(ServiceInstance service) async {
         final sensorStatus = isRecording ? "SENSORES ACTIVOS" : "En espera";
         
         service.setForegroundNotificationInfo(
-          title: "$status - ${samplingRate} Hz",
+          title: "$status - $samplingRate Hz",
           content: "$sensorStatus - ${DateTime.now().toString().substring(11, 19)}",
         );
       }
