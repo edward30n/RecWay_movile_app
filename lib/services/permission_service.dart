@@ -578,4 +578,132 @@ class PermissionService {
     }
     return true; // En iOS asumimos que está disponible
   }
+
+  /// Método específico para verificar y solicitar permisos de almacenamiento para exportación
+  static Future<bool> requestStoragePermissionsForExport() async {
+    print('💾 === SOLICITUD PERMISOS DE ALMACENAMIENTO PARA EXPORTACIÓN ===');
+    
+    try {
+      if (Platform.isAndroid) {
+        // Verificar versión de Android
+        print('1️⃣ Verificando configuración de almacenamiento...');
+        
+        // Para Android 11+ (API 30+) - usar MANAGE_EXTERNAL_STORAGE
+        final manageStorageStatus = await Permission.manageExternalStorage.status;
+        print('   Gestión de almacenamiento: $manageStorageStatus');
+        
+        if (manageStorageStatus != PermissionStatus.granted) {
+          print('2️⃣ Solicitando gestión de almacenamiento...');
+          final result = await Permission.manageExternalStorage.request();
+          print('   Resultado: $result');
+          
+          if (result == PermissionStatus.granted) {
+            print('✅ Permisos de gestión de almacenamiento concedidos');
+            return true;
+          }
+        } else {
+          print('✅ Permisos de gestión de almacenamiento ya concedidos');
+          return true;
+        }
+        
+        // Fallback: intentar permisos legacy para Android 10 y anteriores
+        print('3️⃣ Intentando permisos legacy...');
+        final storageStatus = await Permission.storage.status;
+        print('   Almacenamiento legacy: $storageStatus');
+        
+        if (storageStatus != PermissionStatus.granted) {
+          final result = await Permission.storage.request();
+          print('   Resultado legacy: $result');
+          
+          if (result == PermissionStatus.granted) {
+            print('✅ Permisos legacy de almacenamiento concedidos');
+            return true;
+          }
+        } else {
+          print('✅ Permisos legacy ya concedidos');
+          return true;
+        }
+        
+        // Verificar si podemos escribir en realidad
+        print('4️⃣ Verificando capacidad de escritura real...');
+        try {
+          final directory = await getApplicationDocumentsDirectory();
+          final testFile = File('${directory.path}/test_export.txt');
+          await testFile.writeAsString('test');
+          await testFile.delete();
+          print('✅ Capacidad de escritura verificada en directorio de la app');
+          return true;
+        } catch (e) {
+          print('❌ No se puede escribir archivos: $e');
+          return false;
+        }
+        
+      } else {
+        // iOS - generalmente no requiere permisos especiales para documentos de la app
+        print('✅ iOS - permisos de almacenamiento no requeridos');
+        return true;
+      }
+    } catch (e) {
+      print('❌ Error verificando permisos de almacenamiento: $e');
+      return false;
+    }
+  }
+
+  /// Mostrar diálogo explicativo para permisos de almacenamiento
+  static Future<void> showStoragePermissionExplanation(BuildContext context) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.folder_open, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('💾 Permisos de Almacenamiento'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Para exportar y compartir tus datos de sensores, necesitamos acceso al almacenamiento.',
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 12),
+            Text(
+              '🎯 ¿Qué necesitamos?\n'
+              '• Permiso para crear archivos CSV\n'
+              '• Acceso para guardar en Downloads\n'
+              '• Capacidad de compartir archivos\n',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 12),
+            Text(
+              '⚙️ Si ves "Gestionar almacenamiento", debes activarlo para permitir que la app funcione correctamente.',
+              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.orange),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              // Intentar solicitar permisos específicos
+              final granted = await requestStoragePermissionsForExport();
+              if (!granted) {
+                // Si falla, abrir configuración
+                await openAppSettings();
+              }
+            },
+            child: const Text('Conceder Permisos'),
+          ),
+        ],
+      ),
+    );
+  }
 }
