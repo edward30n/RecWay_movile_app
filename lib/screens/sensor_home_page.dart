@@ -701,8 +701,9 @@ class _SensorHomePageState extends State<SensorHomePage> {
       csvContent += '# Frecuencia de muestreo: $_samplingRate Hz\n';
       csvContent += '# Formato de datos:\n';
       csvContent += '#   - Sensores (acc/gyro): 6 decimales de precisión\n';
-      csvContent += '#   - GPS (lat/lng): 8 decimales de precisión\n';
-      csvContent += '#   - Filas incompletas automáticamente removidas\n';
+      csvContent += '#   - GPS: Precisión completa sin límite de decimales\n';
+      csvContent += '#   - Filas con campos vacíos consecutivos (,,) automáticamente removidas\n';
+      csvContent += '#   - Validación estricta de integridad de datos\n';
       csvContent += '#\n';
       csvContent += 'timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,gps_lat,gps_lng,gps_accuracy,gps_speed,gps_altitude,gps_heading\n';
       
@@ -793,23 +794,8 @@ class _SensorHomePageState extends State<SensorHomePage> {
       }
 
       if (savedFiles.isNotEmpty) {
-        // Mostrar información sobre la limpieza de datos
-        final originalCount = data.length;
-        final finalCount = cleanedRows.length;
-        
-        if (originalCount != finalCount) {
-          print('📊 Limpieza de datos: $originalCount registros originales → $finalCount registros finales');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Datos procesados: ${originalCount - finalCount} registros incompletos removidos'),
-              backgroundColor: AppColors.accentBlue,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        
-        // Mostrar opciones de exportación
-        _showExportOptionsDialog(savedFiles, finalCount, fileName);
+        // Mostrar opciones de exportación sin mensajes de validación
+        _showExportOptionsDialog(savedFiles, cleanedRows.length, fileName);
       } else {
         throw Exception('No se pudo guardar el archivo en ninguna ubicación');
       }
@@ -1204,21 +1190,47 @@ class _SensorHomePageState extends State<SensorHomePage> {
     return value.toString();
   }
 
-  /// Formatear valores GPS con mayor precisión (8 decimales para coordenadas)
+  /// Formatear valores GPS manteniendo precisión completa
   String _formatGPSValue(dynamic value) {
     if (value == null) return '';
     if (value is num) {
-      return value.toStringAsFixed(8);
+      // Mantener precisión completa para coordenadas GPS
+      return value.toString();
     }
     return value.toString();
   }
 
-  /// Validar que una fila CSV tenga contenido esencial
+  /// Validar que una fila CSV tenga contenido esencial y esté completa
   bool _isValidCSVRow(String csvRow, Map<String, dynamic> originalRow) {
-    // Verificar que tenga timestamp
+    // Verificar que tenga timestamp válido
     if (originalRow['timestamp'] == null) return false;
     
-    // Verificar que tenga al menos algunos datos de sensores
+    // Verificar que la fila CSV tenga el número correcto de campos
+    final fields = csvRow.split(',');
+    if (fields.length != 13) return false;
+    
+    // Verificar que el timestamp no esté vacío
+    if (fields[0].isEmpty) return false;
+    
+    // Verificar que no haya demasiados campos vacíos consecutivos (como ,,)
+    int consecutiveEmptyFields = 0;
+    int maxConsecutiveEmpty = 0;
+    
+    for (int i = 0; i < fields.length; i++) {
+      if (fields[i].isEmpty || fields[i] == 'null' || fields[i] == '') {
+        consecutiveEmptyFields++;
+        maxConsecutiveEmpty = maxConsecutiveEmpty > consecutiveEmptyFields 
+            ? maxConsecutiveEmpty 
+            : consecutiveEmptyFields;
+      } else {
+        consecutiveEmptyFields = 0;
+      }
+    }
+    
+    // Rechazar filas con más de 1 campo vacío consecutivo (es decir, 2 comas seguidas ,,)
+    if (maxConsecutiveEmpty > 1) return false;
+    
+    // Verificar que tenga al menos algunos datos de sensores (no GPS porque puede faltar)
     final hasAccelerometer = originalRow['acc_x'] != null || 
                             originalRow['acc_y'] != null || 
                             originalRow['acc_z'] != null;
@@ -1227,24 +1239,19 @@ class _SensorHomePageState extends State<SensorHomePage> {
                         originalRow['gyro_y'] != null || 
                         originalRow['gyro_z'] != null;
     
-    final hasGPS = originalRow['gps_lat'] != null || 
-                  originalRow['gps_lng'] != null;
-    
-    // La fila es válida si tiene timestamp y al menos un tipo de dato
-    return hasAccelerometer || hasGyroscope || hasGPS;
+    // La fila es válida si tiene timestamp y al menos datos de sensores
+    return hasAccelerometer || hasGyroscope;
   }
 
-  /// Limpiar filas incompletas al final del archivo
+  /// Limpiar filas incompletas al final del archivo con verificación estricta
   List<String> _cleanIncompleteRows(List<String> rows) {
     if (rows.isEmpty) return rows;
     
     // Contar el número esperado de campos (13 campos en total)
     const expectedFieldCount = 13;
     
-    // Buscar desde el final hacia atrás hasta encontrar filas válidas consecutivas
-    int lastValidIndex = rows.length - 1;
-    int consecutiveValidRows = 0;
-    const minConsecutiveValid = 3; // Requerir al menos 3 filas válidas consecutivas
+    // Buscar desde el final hacia atrás la última fila completamente válida
+    int lastValidIndex = -1;
     
     for (int i = rows.length - 1; i >= 0; i--) {
       final fields = rows[i].split(',');
@@ -1254,30 +1261,64 @@ class _SensorHomePageState extends State<SensorHomePage> {
         // Verificar que tenga timestamp válido
         final timestamp = fields[0];
         if (timestamp.isNotEmpty && int.tryParse(timestamp) != null) {
-          consecutiveValidRows++;
+          // Verificar que al menos tengamos algunos datos de sensores
+          // No exigir GPS porque puede no estar disponible, pero sí sensores
+          bool hasSensorData = false;
           
-          // Si hemos encontrado suficientes filas válidas consecutivas, parar aquí
-          if (consecutiveValidRows >= minConsecutiveValid) {
-            break;
+          // Verificar acelerómetro (campos 1, 2, 3)
+          for (int j = 1; j <= 3; j++) {
+            if (fields[j].isNotEmpty && fields[j] != 'null' && fields[j] != '') {
+              hasSensorData = true;
+              break;
+            }
           }
-        } else {
-          // Fila inválida, reiniciar contador
-          consecutiveValidRows = 0;
-          lastValidIndex = i - 1;
+          
+          // Verificar giroscopio (campos 4, 5, 6) si no hay acelerómetro
+          if (!hasSensorData) {
+            for (int j = 4; j <= 6; j++) {
+              if (fields[j].isNotEmpty && fields[j] != 'null' && fields[j] != '') {
+                hasSensorData = true;
+                break;
+              }
+            }
+          }
+          
+          // Verificar que no haya campos vacíos consecutivos (como ,,)
+          // Contar campos vacíos consecutivos
+          int consecutiveEmptyFields = 0;
+          int maxConsecutiveEmpty = 0;
+          
+          for (int j = 0; j < fields.length; j++) {
+            if (fields[j].isEmpty || fields[j] == 'null') {
+              consecutiveEmptyFields++;
+              maxConsecutiveEmpty = maxConsecutiveEmpty > consecutiveEmptyFields 
+                  ? maxConsecutiveEmpty 
+                  : consecutiveEmptyFields;
+            } else {
+              consecutiveEmptyFields = 0;
+            }
+          }
+          
+          // La fila es válida si tiene timestamp, datos de sensores, y NO tiene campos vacíos consecutivos
+          if (hasSensorData && maxConsecutiveEmpty <= 1) {
+            lastValidIndex = i;
+            break; // Encontramos la última fila válida
+          }
         }
-      } else {
-        // Fila incompleta, reiniciar contador
-        consecutiveValidRows = 0;
-        lastValidIndex = i - 1;
       }
     }
     
-    // Si no encontramos suficientes filas válidas consecutivas al final,
-    // usar la última fila que sabemos que es válida
-    if (consecutiveValidRows < minConsecutiveValid && lastValidIndex >= 0) {
+    // Si encontramos una fila válida y hay filas a remover
+    if (lastValidIndex >= 0 && lastValidIndex < rows.length - 1) {
       final cleanedRows = rows.sublist(0, lastValidIndex + 1);
-      print('🔧 Limpieza CSV: Removidas ${rows.length - cleanedRows.length} filas incompletas del final');
+      // Removidos los print statements para no mostrar mensajes al usuario
       return cleanedRows;
+    }
+    
+    // Si no hay filas a remover o no encontramos filas válidas
+    if (lastValidIndex == -1) {
+      // Removido el print statement
+      return []; // Retornar lista vacía si no hay filas válidas
     }
     
     return rows;

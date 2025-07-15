@@ -26,7 +26,7 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen> {
     // Timeout de seguridad - máximo 20 segundos
     _timeoutTimer = Timer(const Duration(seconds: 20), () {
       if (!_isCompleted && mounted) {
-        print('⏰ Timeout de inicialización alcanzado');
+        print(' de inicialización alcanzado');
         _navigateToHome();
       }
     });
