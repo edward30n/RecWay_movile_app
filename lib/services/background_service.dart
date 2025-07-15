@@ -24,12 +24,12 @@ Future<void> initializeService() async {
     await service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: onStart,
-        autoStart: false, // Cambiar a false para control manual
-        isForegroundMode: true,
-        notificationChannelId: 'sensor_data_collector',
-        initialNotificationTitle: 'Sensor Data Collector Pro',
-        initialNotificationContent: 'Recolectando datos en segundo plano...',
-        foregroundServiceNotificationId: 888,
+        autoStart: false, 
+        isForegroundMode: true, // HABILITADO: Necesario para persistir cuando pantalla bloqueada
+        notificationChannelId: 'sensor_data_collector_persistent',
+        initialNotificationTitle: 'RecWay - Recolección Activa',
+        initialNotificationContent: 'Manteniendo sensores activos en segundo plano',
+        foregroundServiceNotificationId: 999,
       ),
       iosConfiguration: IosConfiguration(
         autoStart: false, // Cambiar a false para control manual
@@ -53,11 +53,15 @@ Future<void> initializeService() async {
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
   
-  // INMEDIATAMENTE configurar como servicio de primer plano
+  // CONFIGURAR COMO SERVICIO FOREGROUND INMEDIATAMENTE
   if (service is AndroidServiceInstance) {
     try {
       await service.setAsForegroundService();
-      print('✅ Servicio configurado como foreground service');
+      service.setForegroundNotificationInfo(
+        title: "RecWay - Sistema Activo",
+        content: "Listo para recolectar datos de sensores",
+      );
+      print('✅ Servicio configurado como foreground persistente');
     } catch (e) {
       print('⚠️ Error configurando foreground service: $e');
     }
@@ -157,12 +161,17 @@ void onStart(ServiceInstance service) async {
       );
     }
     
-    // Actualizar notificación
+    // Actualizar notificación - RESTAURADO con configuración robusta
     if (service is AndroidServiceInstance) {
-      service.setForegroundNotificationInfo(
-        title: "🔴 GRABANDO - $samplingRate Hz",
-        content: "Sesión: ${currentSessionId?.substring(8, 18) ?? 'N/A'} - Sensores ACTIVOS + NATIVOS",
-      );
+      try {
+        service.setForegroundNotificationInfo(
+          title: "🔴 RecWay GRABANDO - $samplingRate Hz",
+          content: "Sensores activos - ${currentSessionId?.substring(8, 18) ?? 'N/A'}",
+        );
+        print('✅ Notificación de grabación configurada');
+      } catch (e) {
+        print('⚠️ Error configurando notificación: $e');
+      }
     }
     
     // Iniciar timer de muestreo
@@ -240,37 +249,52 @@ void onStart(ServiceInstance service) async {
     // Deshabilitar WakeLock cuando no se está grabando
     WakelockPlus.disable();
     
-    // Actualizar notificación
-    if (service is AndroidServiceInstance) {
-      service.setForegroundNotificationInfo(
-        title: "RecWay",
-        content: "Listo para recolectar datos",
-      );
-    }
+    // Actualizar notificación - DESHABILITADO para evitar crashes
+    // if (service is AndroidServiceInstance) {
+    //   service.setForegroundNotificationInfo(
+    //     title: "RecWay",
+    //     content: "Listo para recolectar datos",
+    //   );
+    // }
   });
   
-  // Mantener servicio vivo con heartbeat más agresivo
-  Timer.periodic(Duration(seconds: 5), (timer) async {
+  // Mantener servicio vivo con estrategia ROBUSTA
+  Timer.periodic(Duration(seconds: 3), (timer) async {
     if (service is AndroidServiceInstance) {
-      if (await service.isForegroundService()) {
-        final status = isRecording ? "🔴 GRABANDO" : "⚪ LISTO";
-        final sensorStatus = isRecording ? "SENSORES ACTIVOS" : "En espera";
+      try {
+        // Forzar que el servicio se mantenga como foreground
+        await service.setAsForegroundService();
         
-        service.setForegroundNotificationInfo(
-          title: "$status - $samplingRate Hz",
-          content: "$sensorStatus - ${DateTime.now().toString().substring(11, 19)}",
-        );
+        if (await service.isForegroundService()) {
+          // Actualizar notificación persistente
+          final status = isRecording ? "🔴 GRABANDO" : "⚪ LISTO";
+          final timestamp = DateTime.now().toString().substring(11, 19);
+          
+          service.setForegroundNotificationInfo(
+            title: "$status RecWay - $samplingRate Hz",
+            content: "Sensores activos - $timestamp",
+          );
+        }
+      } catch (e) {
+        print('⚠️ Error manteniendo servicio foreground: $e');
       }
     }
     
-    // Verificar estado de sensores
+    // Verificar estado de sensores y reiniciar si es necesario
     if (isRecording) {
-      print('💓 Heartbeat - Recording: $isRecording, Accel: ${currentAccelerometer != null}, Gyro: ${currentGyroscope != null}, GPS: ${currentPosition != null}');
+      print('💓 Heartbeat - Recording: $isRecording, Session: ${currentSessionId?.substring(8, 18)}');
+      
+      // Mantener WakeLock activo agresivamente
+      try {
+        await WakelockPlus.enable();
+      } catch (e) {
+        print('❌ Error reactivando WakeLock: $e');
+      }
       
       // Si los sensores no tienen datos nuevos, reiniciarlos
       if (currentAccelerometer == null || currentGyroscope == null) {
-        print('⚠️ Sensores sin datos - Reactivando...');
-        await WakelockPlus.enable(); // Forzar reactivación
+        print('⚠️ Sensores sin datos - Reactivando streams...');
+        // Aquí podrías reiniciar los streams si es necesario
       }
     }
   });

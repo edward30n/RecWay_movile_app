@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:io';
 import '../services/database_service.dart';
 import '../services/permission_service.dart';
+import '../services/device_info_service.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
@@ -50,6 +51,16 @@ class _SensorHomePageState extends State<SensorHomePage> {
   GyroscopeEvent? _currentGyroscope;
   Position? _currentPosition;
 
+  // Variables para metadata del dispositivo SIMPLIFICADA
+  String _deviceId = '';
+  String _deviceModel = '';
+  String _manufacturer = '';
+  String _platform = '';
+  String _appVersion = '';
+  String _appBuildNumber = '';
+  String _osVersion = '';
+  String _empresa = 'RecWay'; // Nombre de la empresa
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +72,9 @@ class _SensorHomePageState extends State<SensorHomePage> {
   }
 
   Future<void> _initializeApp() async {
+    // Cargar información del dispositivo
+    await _loadDeviceInfo();
+    
     // Verificar si es la primera vez que se abre la app
     final isFirstLaunch = await _isFirstLaunch();
     
@@ -94,6 +108,44 @@ class _SensorHomePageState extends State<SensorHomePage> {
     // Aquí podrías usar SharedPreferences para verificar si es el primer lanzamiento
     // Por simplicidad, siempre mostraremos el diálogo en esta versión
     return true;
+  }
+
+  Future<void> _loadDeviceInfo() async {
+    try {
+      print('🔍 Iniciando carga básica de información del dispositivo...');
+      
+      // Obtener información básica del dispositivo usando el servicio robusto
+      final deviceInfo = await DeviceInfoService.getDeviceInfo();
+      
+      // Asignar solo los valores básicos necesarios para compatibilidad
+      _deviceId = deviceInfo['deviceId'] ?? 'Unknown';
+      _platform = deviceInfo['platform'] ?? 'Unknown';
+      _deviceModel = deviceInfo['deviceModel'] ?? 'Unknown';
+      _manufacturer = deviceInfo['manufacturer'] ?? 'Unknown';
+      _osVersion = deviceInfo['platformVersion'] ?? 'Unknown';
+      _appVersion = deviceInfo['appVersion'] ?? 'Unknown';
+      _appBuildNumber = deviceInfo['buildNumber'] ?? 'Unknown';
+
+      print('✅ Información básica del dispositivo cargada:');
+      print('   - Device ID: $_deviceId');
+      print('   - Platform: $_platform');
+      print('   - Model: $_manufacturer $_deviceModel');
+      print('   - OS: $_osVersion');
+      print('   - App: $_appVersion ($_appBuildNumber)');
+      
+      print('ℹ️ La información completa de sensores se carga automáticamente durante la exportación');
+      
+    } catch (e) {
+      print('❌ Error loading device info: $e');
+      // Valores por defecto en caso de error
+      _platform = 'Error';
+      _deviceModel = 'Error loading';
+      _manufacturer = 'Error loading';
+      _deviceId = 'error_' + DateTime.now().millisecondsSinceEpoch.toString();
+      _osVersion = 'Error loading';
+      _appVersion = 'Error loading';
+      _appBuildNumber = 'Error loading';
+    }
   }
 
   Future<void> _showWelcomeAndPermissionsDialog() async {
@@ -688,22 +740,48 @@ class _SensorHomePageState extends State<SensorHomePage> {
         return;
       }
 
-      // Crear CSV de manera más eficiente
+      // Crear CSV de manera más eficiente con nombre de archivo mejorado
       final now = DateTime.now();
-      final fileName = 'sensor_data_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}.csv';
+      final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+      
+      // Obtener metadatos del dispositivo usando el servicio robusto
+      final exportMetadata = await DeviceInfoService.getExportMetadata(_currentSessionId!, data.length);
+      final deviceIdShort = exportMetadata['deviceId'].toString().length > 8 ? exportMetadata['deviceId'].toString().substring(0, 8) : exportMetadata['deviceId'].toString();
+      final modelShort = exportMetadata['deviceModel'].toString().length > 10 ? exportMetadata['deviceModel'].toString().substring(0, 10).replaceAll(' ', '') : exportMetadata['deviceModel'].toString().replaceAll(' ', '');
+      final fileName = '${_empresa}_${modelShort}_${deviceIdShort}_$timestamp.csv';
 
-      // Generar contenido CSV en chunks para evitar problemas de memoria
+      // Generar header CSV completo usando el servicio
       String csvContent = '';
-      csvContent += '# Datos de Sensores - Sensor Data Collector Pro\n';
-      csvContent += '# Sesión: $_currentSessionId\n';
-      csvContent += '# Fecha de exportación: ${DateTime.now().toIso8601String()}\n';
-      csvContent += '# Total de registros: ${data.length}\n';
-      csvContent += '# Frecuencia de muestreo: $_samplingRate Hz\n';
-      csvContent += '# Formato de datos:\n';
-      csvContent += '#   - Sensores (acc/gyro): 6 decimales de precisión\n';
-      csvContent += '#   - GPS: Precisión completa sin límite de decimales\n';
-      csvContent += '#   - Filas con campos vacíos consecutivos (,,) automáticamente removidas\n';
-      csvContent += '#   - Validación estricta de integridad de datos\n';
+      csvContent += '# ================================================\n';
+      csvContent += '# RECWAY SENSOR DATA EXPORT - METADATA COMPLETO\n';
+      csvContent += '# ================================================\n';
+      csvContent += '# Device ID: ${exportMetadata['deviceId']}\n';
+      csvContent += '# Session ID: ${exportMetadata['sessionId']}\n';
+      csvContent += '# Platform: ${exportMetadata['platform']}\n';
+      csvContent += '# Device Model: ${exportMetadata['deviceModel']}\n';
+      csvContent += '# Manufacturer: ${exportMetadata['manufacturer']}\n';
+      csvContent += '# Brand: ${exportMetadata['manufacturer']}\n';
+      csvContent += '# OS Version: ${exportMetadata['platformVersion']}\n';
+      csvContent += '# App Version: ${exportMetadata['appVersion']} (${exportMetadata['buildNumber']})\n';
+      csvContent += '# Company: $_empresa\n';
+      csvContent += '# Android ID: ${exportMetadata['deviceId']}\n';
+      csvContent += '# Battery Info: ${exportMetadata['batteryInfo']}\n';
+      csvContent += '# \n';
+      csvContent += '# === INFORMACION DE SENSORES ===\n';
+      csvContent += '# Accelerometer Available: ${exportMetadata['hasAccelerometer']}\n';
+      csvContent += '# Accelerometer Info: ${exportMetadata['accelerometerInfo']}\n';
+      csvContent += '# Gyroscope Available: ${exportMetadata['hasGyroscope']}\n';
+      csvContent += '# Gyroscope Info: ${exportMetadata['gyroscopeInfo']}\n';
+      csvContent += '# GPS Available: ${exportMetadata['hasGPS']}\n';
+      csvContent += '# GPS Info: ${exportMetadata['gpsInfo']}\n';
+      csvContent += '# \n';
+      csvContent += '# === INFORMACION DE GRABACION ===\n';
+      csvContent += '# Export Date: ${DateTime.now().toIso8601String()}\n';
+      csvContent += '# Total Records: ${data.length}\n';
+      csvContent += '# Sampling Rate: $_samplingRate Hz\n';
+      csvContent += '# Recording Duration: ${_formatTime(_recordingTime)}\n';
+      csvContent += '# Average Sample Rate: ${_recordingTime > 0 ? (data.length / _recordingTime).toStringAsFixed(2) : "0"} Hz\n';
+      csvContent += '# ================================================\n';
       csvContent += '#\n';
       csvContent += 'timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,gps_lat,gps_lng,gps_accuracy,gps_speed,gps_altitude,gps_heading\n';
       

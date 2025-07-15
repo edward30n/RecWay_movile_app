@@ -9,20 +9,15 @@
     <!-- Permisos para sensores -->
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
     
-    <!-- Permisos para segundo plano -->
+    <!-- Permisos para segundo plano OPTIMIZADOS -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.DEVICE_POWER" tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     
-    <!-- Permisos de notificaciones -->
+    <!-- Permisos de notificaciones ESENCIALES para foreground service -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
     <!-- Permisos de almacenamiento para Android 14+ -->
@@ -72,13 +67,14 @@
             </intent-filter>
         </activity>
         
-        <!-- Servicio en segundo plano mejorado -->
+        <!-- Servicio en segundo plano con configuración ROBUSTA -->
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:foregroundServiceType="location|dataSync"
+            android:foregroundServiceType="location"
             android:exported="false"
             android:enabled="true"
             android:stopWithTask="false"
+            android:permission="android.permission.BIND_JOB_SERVICE"
             tools:replace="android:exported" />
             
         <!-- Receptor para reiniciar el servicio -->

@@ -26,17 +26,21 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.8.3
   
-  # Servicio en segundo plano
+  # Servicio en segundo plano ROBUSTO
   flutter_background_service: ^5.0.5
   
   # WakeLock para mantener sensores activos
   wakelock_plus: ^1.2.8
   
-  # Notificaciones
+  # Notificaciones ESENCIALES para foreground service
   flutter_local_notifications: ^19.3.0
   
   # Compartir archivos
   share_plus: ^11.0.0
+  
+  # Información del dispositivo
+  device_info_plus: ^11.5.0
+  package_info_plus: ^8.0.2
   
   # Almacenamiento de archivos
   path_provider: ^2.1.1
@@ -44,6 +48,8 @@ dependencies:
   # Utilidades
   intl: ^0.20.2
   shared_preferences: ^2.2.2
+  crypto: ^3.0.3
+  battery_plus: ^6.0.2
   
   # UI
   cupertino_icons: ^1.0.8

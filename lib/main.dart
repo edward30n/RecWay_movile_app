@@ -26,22 +26,22 @@ void main() async {
     
     print('🚀 Iniciando aplicación principal...');
     
-    // Inicializar servicio en segundo plano solo una vez
+    // Inicializar servicio en segundo plano ROBUSTO
     try {
       print('🔧 Verificando estado del servicio...');
       final service = FlutterBackgroundService();
       final isRunning = await service.isRunning();
       
       if (!isRunning) {
-        print('🚀 Inicializando servicio en segundo plano...');
+        print('🚀 Inicializando servicio robusto en segundo plano...');
         await initializeService();
-        print('✅ Servicio en segundo plano inicializado completamente');
+        print('✅ Servicio robusto inicializado completamente');
       } else {
-        print('✅ Servicio en segundo plano ya está ejecutándose');
+        print('✅ Servicio robusto ya está ejecutándose');
       }
     } catch (e) {
       print('⚠️ Error con servicio en segundo plano: $e');
-      // Continuar sin el servicio si hay error
+      // Continuar sin el servicio si hay error - la app principal seguirá funcionando
     }
     
     runApp(MyApp());
