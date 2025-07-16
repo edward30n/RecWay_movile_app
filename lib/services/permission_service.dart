@@ -803,7 +803,13 @@ class PermissionService {
           children: [
             Icon(Icons.settings_backup_restore, color: Colors.blue),
             SizedBox(width: 8),
-            Text('🔄 Servicio en Segundo Plano'),
+            Flexible(
+              child: Text(
+                'Background Service',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
           ],
         ),
         content: const SingleChildScrollView(
@@ -812,15 +818,15 @@ class PermissionService {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Para recolectar datos continuamente, incluso con la pantalla bloqueada, necesitamos configurar permisos especiales.',
+                'Para recolectar datos continuamente, necesitamos permisos especiales.',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               SizedBox(height: 16),            Text(
-              '🎯 Permisos necesarios:',
+              'Permisos necesarios:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
-            Text('• Ubicación TODO EL TIEMPO (no solo "mientras usas la app")'),
+            Text('• Ubicación todo el tiempo'),
             // COMENTADO TEMPORALMENTE - No críticos por ahora
             // Text('• Notificaciones (para mostrar estado de grabación)'),
             // Text('• Sin optimización de batería (para mejor rendimiento)'),
@@ -831,12 +837,12 @@ class PermissionService {
               ),
               SizedBox(height: 8),
               Text(
-                'Cuando se solicite ubicación, DEBE seleccionar "Permitir TODO EL TIEMPO" para que el servicio funcione correctamente.',
+                'Cuando se solicite ubicación, debe seleccionar "Permitir TODO EL TIEMPO" para que el servicio funcione.',
                 style: TextStyle(fontSize: 14, color: Colors.orange),
               ),
               SizedBox(height: 12),
               Text(
-                '🔧 Si los permisos no funcionan, puede ir manualmente a:\nConfiguraciones > Aplicaciones > RecWay > Permisos',
+                'Si los permisos no funcionan, puede ir manualmente a:\nConfiguraciones > Aplicaciones > RecWay > Permisos',
                 style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ],
