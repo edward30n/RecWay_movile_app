@@ -97,11 +97,15 @@ class _SensorHomePageState extends State<SensorHomePage> {
       _showLocationServiceDialog();
     }
 
-    // Verificar permisos específicos
+    // Verificar permisos específicos y background service
     await _checkAndRequestSpecificPermissions();
     
+    // Solicitar permisos de background service silenciosamente
+    await PermissionService.requestBackgroundServicePermissions();
+    
+    // COMENTADO TEMPORALMENTE - No crítico por ahora
     // Solicitar deshabilitar optimización de batería
-    await _requestBatteryOptimizationPermission();
+    // await _requestBatteryOptimizationPermission();
   }
 
   Future<bool> _isFirstLaunch() async {
@@ -618,12 +622,44 @@ class _SensorHomePageState extends State<SensorHomePage> {
   }
 
   Future<void> _startBackgroundService() async {
-    final service = FlutterBackgroundService();
-    
-    service.invoke('startRecording', {
-      'sessionId': _currentSessionId,
-      'samplingRate': _samplingRate,
-    });
+    try {
+      print('🔄 Iniciando servicio en segundo plano...');
+      
+      // Verificar permisos críticos antes de iniciar
+      final hasBackgroundPermissions = await PermissionService.requestBackgroundServicePermissions();
+      
+      if (!hasBackgroundPermissions) {
+        print('⚠️ Permisos de background insuficientes - funcionalidad limitada');
+        return;
+      }
+      
+      final service = FlutterBackgroundService();
+      
+      // Verificar si el servicio está configurado
+      final isRunning = await service.isRunning();
+      print('🔍 Estado del servicio: $isRunning');
+      
+      // Iniciar grabación en el servicio
+      service.invoke('startRecording', {
+        'sessionId': _currentSessionId,
+        'samplingRate': _samplingRate,
+      });
+      
+      print('✅ Comando de grabación enviado al servicio en segundo plano');
+      
+      // Mostrar confirmación silenciosa en consola
+      print('🔄 Servicio en segundo plano activado');
+      
+    } catch (e) {
+      print('❌ Error iniciando servicio en segundo plano: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error en servicio de segundo plano: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   void _showDataSummary() {
@@ -1171,6 +1207,8 @@ class _SensorHomePageState extends State<SensorHomePage> {
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
+  // COMENTADO TEMPORALMENTE - No crítico por ahora
+  /*
   Future<void> _requestBatteryOptimizationPermission() async {
     final status = await Permission.ignoreBatteryOptimizations.request();
     
@@ -1258,6 +1296,7 @@ class _SensorHomePageState extends State<SensorHomePage> {
       },
     );
   }
+  */
 
   /// Formatear valores de sensores (acelerómetro y giroscopio) con 6 decimales
   String _formatSensorValue(dynamic value) {
@@ -1444,10 +1483,24 @@ class _SensorHomePageState extends State<SensorHomePage> {
                     _samplingRate = rate;
                   });
                 },
-                onBackgroundModeChanged: (enabled) {
-                  setState(() {
-                    _backgroundMode = enabled;
-                  });
+                onBackgroundModeChanged: (enabled) async {
+                  if (enabled) {
+                    // Solo verificar si ya tenemos permisos, sin solicitar de nuevo
+                    final hasLocationAlways = await PermissionService.hasLocationAlwaysPermission();
+                    
+                    if (hasLocationAlways) {
+                      setState(() {
+                        _backgroundMode = enabled;
+                      });
+                    } else {
+                      // Mostrar explicación sin snackbar
+                      await PermissionService.showBackgroundServiceExplanation(context);
+                    }
+                  } else {
+                    setState(() {
+                      _backgroundMode = enabled;
+                    });
+                  }
                 },
               ),
 

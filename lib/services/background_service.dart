@@ -104,10 +104,10 @@ void onStart(ServiceInstance service) async {
     service.stopSelf();
   });
   
-  // Configurar GPS con máxima precisión
+  // Configurar GPS con máxima precisión y actualización frecuente
   const LocationSettings locationSettings = LocationSettings(
     accuracy: LocationAccuracy.bestForNavigation,
-    distanceFilter: 0,
+    distanceFilter: 0, // Sin filtro de distancia para capturar todos los cambios
     timeLimit: Duration(seconds: 30),
   );
   
@@ -178,6 +178,33 @@ void onStart(ServiceInstance service) async {
     final samplingInterval = Duration(milliseconds: (1000 / samplingRate).round());
     samplingTimer = Timer.periodic(samplingInterval, (timer) async {
       if (isRecording && currentSessionId != null) {
+        // FORZAR lectura de GPS fresca para cada muestra
+        try {
+          // Intentar obtener posición actual fresca con timeout corto
+          final freshPosition = await Geolocator.getCurrentPosition(
+            locationSettings: LocationSettings(
+              accuracy: LocationAccuracy.bestForNavigation,
+              timeLimit: Duration(seconds: 2), // Timeout corto para no bloquear
+            ),
+          );
+          
+          // Actualizar currentPosition con datos frescos
+          currentPosition = freshPosition;
+          
+          // Log valores GPS frescos cada 10 muestras
+          if (DateTime.now().millisecondsSinceEpoch % 10000 < samplingInterval.inMilliseconds) {
+            final speedStr = freshPosition.speed.toStringAsFixed(2);
+            final accuracyStr = freshPosition.accuracy.toStringAsFixed(2);
+            final headingStr = freshPosition.heading.toStringAsFixed(1);
+            print('🗺️ GPS fresco: Lat=${freshPosition.latitude.toStringAsFixed(6)}, '
+                  'Lng=${freshPosition.longitude.toStringAsFixed(6)}, '
+                  'Speed=$speedStr m/s, Accuracy=$accuracyStr m, Heading=$headingStr°');
+          }
+        } catch (e) {
+          // Si falla obtener posición fresca, usar la última conocida
+          print('⚠️ No se pudo obtener GPS fresco, usando último conocido: $e');
+        }
+        
         await _saveDataPoint(
           currentSessionId!,
           currentAccelerometer,
@@ -220,7 +247,9 @@ void onStart(ServiceInstance service) async {
     ).listen(
       (position) {
         currentPosition = position;
-        print('🗺️ GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}');
+        print('🗺️ GPS Stream: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}, '
+              'Speed=${position.speed.toStringAsFixed(2)}m/s, Acc=${position.accuracy.toStringAsFixed(2)}m, '
+              'Head=${position.heading.toStringAsFixed(1)}°');
       },
       onError: (error) {
         print('❌ Error GPS en servicio: $error');
@@ -328,11 +357,15 @@ Future<void> _saveDataPoint(
       'session_id': sessionId,
     });
     
-    // Log cada 10 muestras para verificar que está funcionando
+    // Log detallado cada 10 muestras para verificar que está funcionando
     if (timestamp % 10000 < 1000) { // Aproximadamente cada 10 segundos
       final accelStr = accelerometer?.x.toStringAsFixed(2) ?? 'null';
-      final gpsStr = position?.latitude.toStringAsFixed(4) ?? 'null';
-      print('💾 Datos guardados: Accel=$accelStr, GPS=$gpsStr');
+      final gpsLatStr = position?.latitude.toStringAsFixed(6) ?? 'null';
+      final gpsSpeedStr = position?.speed.toStringAsFixed(2) ?? 'null';
+      final gpsAccuracyStr = position?.accuracy.toStringAsFixed(2) ?? 'null';
+      final gpsHeadingStr = position?.heading.toStringAsFixed(1) ?? 'null';
+      
+      print('💾 Datos guardados: Accel=$accelStr, GPS=[Lat=$gpsLatStr, Speed=$gpsSpeedStr m/s, Acc=$gpsAccuracyStr m, Head=$gpsHeadingStr°]');
     }
   } catch (e) {
     print('❌ Error guardando datos en servicio: $e');
