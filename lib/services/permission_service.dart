@@ -706,4 +706,156 @@ class PermissionService {
       ),
     );
   }
+
+  /// Solicitar permisos específicos para servicio en segundo plano
+  static Future<bool> requestBackgroundServicePermissions() async {
+    print('🔄 Solicitando permisos para servicio en segundo plano...');
+    
+    try {
+      // 1. Verificar permiso de ubicación en segundo plano
+      print('📍 Verificando permiso de ubicación en segundo plano...');
+      final backgroundLocationStatus = await Permission.locationAlways.status;
+      print('📍 Estado actual de ubicación en segundo plano: $backgroundLocationStatus');
+      
+      if (backgroundLocationStatus != PermissionStatus.granted) {
+        print('📍 Solicitando permiso de ubicación en segundo plano...');
+        final newStatus = await Permission.locationAlways.request();
+        print('📍 Resultado de ubicación en segundo plano: $newStatus');
+        
+        if (newStatus != PermissionStatus.granted) {
+          print('⚠️ Permiso de ubicación en segundo plano denegado');
+          return false;
+        }
+      }
+      
+      // 2. Verificar permiso de notificaciones (necesario para foreground service)
+      // COMENTADO TEMPORALMENTE - No es crítico por ahora
+      /*
+      print('🔔 Verificando permiso de notificaciones...');
+      final notificationStatus = await Permission.notification.status;
+      print('🔔 Estado actual de notificaciones: $notificationStatus');
+      
+      if (notificationStatus != PermissionStatus.granted) {
+        print('🔔 Solicitando permiso de notificaciones...');
+        final newStatus = await Permission.notification.request();
+        print('🔔 Resultado de notificaciones: $newStatus');
+        
+        if (newStatus != PermissionStatus.granted) {
+          print('⚠️ Permiso de notificaciones denegado');
+          // No es crítico, pero afecta la visibilidad del servicio
+        }
+      }
+      */
+      
+      // 3. Verificar optimización de batería
+      // COMENTADO TEMPORALMENTE - No es crítico por ahora
+      /*
+      print('🔋 Verificando optimización de batería...');
+      final batteryOptStatus = await Permission.ignoreBatteryOptimizations.status;
+      print('🔋 Estado de optimización de batería: $batteryOptStatus');
+      
+      if (batteryOptStatus != PermissionStatus.granted) {
+        print('🔋 Solicitando deshabilitar optimización de batería...');
+        final newStatus = await Permission.ignoreBatteryOptimizations.request();
+        print('🔋 Resultado de optimización de batería: $newStatus');
+        
+        if (newStatus != PermissionStatus.granted) {
+          print('⚠️ Optimización de batería no deshabilitada - puede afectar el rendimiento');
+        }
+      }
+      */
+      
+      // 4. Verificar todos los permisos críticos
+      final locationAlways = await Permission.locationAlways.isGranted;
+      final locationWhenInUse = await Permission.location.isGranted;
+      
+      print('📊 Resumen de permisos para background service:');
+      print('   - Ubicación siempre: $locationAlways');
+      print('   - Ubicación en uso: $locationWhenInUse');
+      // COMENTADO TEMPORALMENTE - No críticos por ahora
+      // print('   - Notificaciones: ${await Permission.notification.isGranted}');
+      // print('   - Sin optimización batería: ${await Permission.ignoreBatteryOptimizations.isGranted}');
+      
+      // El servicio puede funcionar si tiene al menos ubicación "siempre"
+      final canRunBackground = locationAlways && locationWhenInUse;
+      
+      if (canRunBackground) {
+        print('✅ Permisos de background service configurados correctamente');
+      } else {
+        print('⚠️ Permisos de background service incompletos');
+      }
+      
+      return canRunBackground;
+      
+    } catch (e) {
+      print('❌ Error solicitando permisos de background service: $e');
+      return false;
+    }
+  }
+
+  /// Mostrar diálogo explicativo para permisos de background service
+  static Future<void> showBackgroundServiceExplanation(BuildContext context) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.settings_backup_restore, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('🔄 Servicio en Segundo Plano'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Para recolectar datos continuamente, incluso con la pantalla bloqueada, necesitamos configurar permisos especiales.',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              SizedBox(height: 16),            Text(
+              '🎯 Permisos necesarios:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text('• Ubicación TODO EL TIEMPO (no solo "mientras usas la app")'),
+            // COMENTADO TEMPORALMENTE - No críticos por ahora
+            // Text('• Notificaciones (para mostrar estado de grabación)'),
+            // Text('• Sin optimización de batería (para mejor rendimiento)'),
+              SizedBox(height: 16),
+              Text(
+                '⚠️ IMPORTANTE:',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Cuando se solicite ubicación, DEBE seleccionar "Permitir TODO EL TIEMPO" para que el servicio funcione correctamente.',
+                style: TextStyle(fontSize: 14, color: Colors.orange),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '🔧 Si los permisos no funcionan, puede ir manualmente a:\nConfiguraciones > Aplicaciones > RecWay > Permisos',
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Después'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await requestBackgroundServicePermissions();
+            },
+            child: const Text('Configurar Ahora'),
+          ),
+        ],
+      ),
+    );
+  }
 }
