@@ -561,14 +561,6 @@ class _SensorHomePageState extends State<SensorHomePage> {
     if (_backgroundMode) {
       await _startBackgroundService();
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Grabación iniciada - $_samplingRate Hz'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 3),
-      ),
-    );
   }
 
   void _stopRecording() {
