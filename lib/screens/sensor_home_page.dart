@@ -11,6 +11,7 @@ import 'dart:io';
 import '../services/database_service.dart';
 import '../services/permission_service.dart';
 import '../services/device_info_service.dart';
+import '../services/http_service.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/status_cards.dart';
@@ -1025,12 +1026,23 @@ class _SensorHomePageState extends State<SensorHomePage> {
           TextButton.icon(
             onPressed: () {
               Navigator.pop(context);
+              _showHttpUploadDialog(files.first, recordCount);
+            },
+            icon: Icon(Icons.cloud_upload, color: AppColors.warning),
+            label: Text(
+              'Enviar HTTP',
+              style: TextStyle(color: AppColors.warning),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
               _showFileDetailsDialog(files, recordCount);
             },
-            icon: Icon(Icons.info, color: AppColors.warning),
+            icon: Icon(Icons.info, color: AppColors.surface),
             label: Text(
               'Detalles',
-              style: TextStyle(color: AppColors.warning),
+              style: TextStyle(color: AppColors.surface),
             ),
           ),
           ElevatedButton(
@@ -1431,6 +1443,332 @@ class _SensorHomePageState extends State<SensorHomePage> {
     }
     
     return rows;
+  }
+
+  /// Mostrar diálogo de envío HTTP
+  Future<void> _showHttpUploadDialog(File csvFile, int recordCount) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.primaryMedium,
+          title: Row(
+            children: [
+              Icon(Icons.cloud_upload, color: AppColors.accentBlue, size: 24),
+              SizedBox(width: 8),
+              Text(
+                'Envío HTTP',
+                style: AppTextStyles.headline3.copyWith(color: AppColors.surface),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enviar archivo CSV al servidor:',
+                style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+              ),
+              SizedBox(height: 12),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryDark.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.surface.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '📄 ${csvFile.path.split('/').last}',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.surface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '📊 $recordCount registros',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.surface.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+              // Estado de configuración
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: HttpService.isConfigured 
+                    ? AppColors.success.withOpacity(0.1)
+                    : AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: HttpService.isConfigured 
+                      ? AppColors.success.withOpacity(0.3)
+                      : AppColors.warning.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      HttpService.isConfigured ? Icons.check_circle : Icons.warning,
+                      color: HttpService.isConfigured ? AppColors.success : AppColors.warning,
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        HttpService.isConfigured 
+                          ? 'Servidor configurado y listo'
+                          : 'Servidor no configurado',
+                        style: AppTextStyles.body2.copyWith(
+                          color: AppColors.surface,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                Navigator.pop(context);
+                await HttpService.showConfigurationDialog(context);
+              },
+              icon: Icon(Icons.settings, color: AppColors.surface),
+              label: Text(
+                'Configurar',
+                style: TextStyle(color: AppColors.surface),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.surface),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: HttpService.isConfigured 
+                ? () {
+                    Navigator.pop(context);
+                    _uploadFileToServer(csvFile, recordCount);
+                  }
+                : null,
+              icon: Icon(Icons.send),
+              label: Text('Enviar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accentBlue,
+                foregroundColor: AppColors.surface,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Enviar archivo al servidor
+  Future<void> _uploadFileToServer(File csvFile, int recordCount) async {
+    try {
+      // Mostrar diálogo de progreso
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.primaryMedium,
+          content: Row(
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentBlue),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Enviando archivo...',
+                      style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Conectando con servidor',
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.surface.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Preparar metadata para el envío
+      final metadata = {
+        'deviceId': _deviceId,
+        'sessionId': _currentSessionId,
+        'platform': _platform,
+        'deviceModel': _deviceModel,
+        'manufacturer': _manufacturer,
+        'appVersion': _appVersion,
+        'recordCount': recordCount,
+        'uploadTimestamp': DateTime.now().toIso8601String(),
+      };
+
+      // Enviar archivo
+      final result = await HttpService.uploadCSVFile(
+        csvFile: csvFile,
+        metadata: metadata,
+      );
+
+      // Cerrar diálogo de progreso
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      // Mostrar resultado
+      _showUploadResultDialog(result, csvFile.path.split('/').last);
+
+    } catch (e) {
+      // Cerrar diálogo de progreso
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error durante el envío: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  /// Mostrar resultado del envío
+  void _showUploadResultDialog(HttpUploadResult result, String fileName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.primaryMedium,
+        title: Row(
+          children: [
+            Icon(
+              result.success ? Icons.check_circle : Icons.error,
+              color: result.success ? AppColors.success : Colors.red,
+              size: 24,
+            ),
+            SizedBox(width: 8),
+            Text(
+              result.success ? 'Envío Exitoso' : 'Error de Envío',
+              style: AppTextStyles.headline3.copyWith(color: AppColors.surface),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: result.success 
+                  ? AppColors.success.withOpacity(0.1)
+                  : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: result.success 
+                    ? AppColors.success.withOpacity(0.3)
+                    : Colors.red.withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '📄 Archivo: $fileName',
+                    style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                  ),
+                  Text(
+                    '📡 Estado: ${result.statusCode}',
+                    style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                  ),
+                  if (result.message != null)
+                    Text(
+                      '💬 ${result.message}',
+                      style: AppTextStyles.body1.copyWith(color: AppColors.surface),
+                    ),
+                  if (result.error != null)
+                    Text(
+                      '❌ ${result.error}',
+                      style: AppTextStyles.body1.copyWith(color: Colors.red.shade300),
+                    ),
+                ],
+              ),
+            ),
+            if (result.responseBody != null && result.responseBody!.isNotEmpty) ...[
+              SizedBox(height: 12),
+              Text(
+                'Respuesta del servidor:',
+                style: AppTextStyles.subtitle1.copyWith(
+                  color: AppColors.surface,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 4),
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryDark.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  result.responseBody!,
+                  style: AppTextStyles.body2.copyWith(
+                    color: AppColors.surface.withOpacity(0.8),
+                    fontFamily: 'monospace',
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          if (!result.success)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                // Opción para reintentar en el futuro
+              },
+              icon: Icon(Icons.refresh, color: AppColors.warning),
+              label: Text(
+                'Reintentar',
+                style: TextStyle(color: AppColors.warning),
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cerrar',
+              style: TextStyle(color: AppColors.surface),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
