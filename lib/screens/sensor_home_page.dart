@@ -504,14 +504,14 @@ class _SensorHomePageState extends State<SensorHomePage> {
       }
     });
 
-    // Configurar GPS con configuración más permisiva para evitar timeouts
+    // Configurar GPS para máxima frecuencia de actualizaciones SIN RESTRICCIONES
     const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high, // Cambiado de bestForNavigation
-      distanceFilter: 1, // Cambiado de 0 para reducir carga
-      timeLimit: Duration(minutes: 2), // Aumentado para evitar timeouts
+      accuracy: LocationAccuracy.bestForNavigation, // Máxima precisión disponible
+      distanceFilter: 0, // Sin filtro de distancia - actualiza con cualquier cambio
+      timeLimit: Duration(minutes: 5), // Timeout amplio para evitar cortes
     );
 
-    // Iniciar stream de GPS con manejo de errores mejorado
+    // Iniciar stream de GPS optimizado para actualizaciones continuas
     _positionSubscription = Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen(
@@ -519,10 +519,14 @@ class _SensorHomePageState extends State<SensorHomePage> {
         setState(() {
           _currentPosition = position;
         });
+        // Log opcional para verificar frecuencia de actualizaciones GPS
+        if (_recordingTime % 30 == 0) { // Solo cada 30 segundos para no saturar
+          print('📍 GPS actualizado: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)} (precisión: ${position.accuracy.toStringAsFixed(1)}m)');
+        }
       },
       onError: (error) {
         print('⚠️ Error GPS: $error');
-        // No mostrar error en UI para timeouts, solo para errores graves
+        // Solo mostrar errores graves, no timeouts normales
         if (!error.toString().contains('timeout') && !error.toString().contains('time limit')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -532,9 +536,10 @@ class _SensorHomePageState extends State<SensorHomePage> {
             ),
           );
         }
-        // Intentar obtener la última posición conocida
+        // Intentar obtener la última posición conocida como fallback
         _tryLastKnownPosition();
       },
+      cancelOnError: false, // No cancelar el stream por errores temporales
     );
 
     // Iniciar sensores con alta frecuencia
